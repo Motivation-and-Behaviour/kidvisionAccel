@@ -1,12 +1,11 @@
 Package: kidvisionAccel
-Title: What the Package Does (One Line, Title Case)
+Title: Opinionated Accelerometer Processing and Reporting for the KidVision Project
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+    person("Taren", "Sanders", , "taren.sanders@acu.edu.au", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-4504-6008"))
+Description: A package that wraps functions to process accelerometer data for particpants in the KidVision project. It ensures that data are processed consistently, produced in a format that can be uploaded the REDCap, and creates a summary report for the participant.
+License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.2
