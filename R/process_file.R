@@ -23,8 +23,8 @@ process_file <- function(file_path, participant_id, overwrite = FALSE) {
     do.report = c(2, 4, 5),
     overwrite = overwrite,
     do.enmo = TRUE,
-    do.hfen = TRUE,
-    do.enmoa = TRUE,
+    do.hfen = FALSE,
+    do.enmoa = FALSE,
     studyname = participant_id,
     # =====================
     # Part 2
@@ -35,7 +35,6 @@ process_file <- function(file_path, participant_id, overwrite = FALSE) {
     includedaycrit = 16,
     qwindow = c(0, 6, 12, 18, 24),
     mvpathreshold = threshold_mod,
-    bout.metric = 4,
     excludefirstlast = FALSE,
     includenightcrit = 16,
     MX.ig.min.dur = 10,
@@ -58,6 +57,8 @@ process_file <- function(file_path, participant_id, overwrite = FALSE) {
       1425 / 1440, # Top 15min
       1435 / 1440 # Top 5min
     ),
+    idloc = 2,
+    acc.metric = "ENMO",
     # =====================
     # Part 3 + 4
     # =====================
@@ -79,6 +80,6 @@ process_file <- function(file_path, participant_id, overwrite = FALSE) {
     # Visual report
     # =====================
     timewindow = c("WW", "MM"),
-    visualreport = FALSE
+    visualreport = TRUE
   )
 }
