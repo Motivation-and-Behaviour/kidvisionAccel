@@ -2,3 +2,4 @@
 
 export(generate_report)
 export(process_file)
+export(upload_report)

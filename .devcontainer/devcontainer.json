@@ -17,7 +17,7 @@
       "installVscDebugger": true
     },
     "ghcr.io/rocker-org/devcontainer-features/r-packages:1": {
-      "packages": "github::cran/GGIR@3.1-4, pagedown, github::rfortherestofus/pagedreport",
+      "packages": "github::cran/GGIR@3.1-4, pagedown, github::rfortherestofus/pagedreport, redcapAPI",
       "installSystemRequirements": true
     }
   },
@@ -27,7 +27,7 @@
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
   // "forwardPorts": [],
   // Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "./install_chrome.sh",
+  "postCreateCommand": "chmod +x ./install_chrome.sh && ./install_chrome.sh",
   // Configure tool-specific properties.
   "customizations": {
     "vscode": {

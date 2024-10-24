@@ -39,5 +39,4 @@ generate_report <- function(
 
   stopifnot(file.exists(pdf_file))
   return(pdf_file)
-  # Check that the report exists and return the file path
 }

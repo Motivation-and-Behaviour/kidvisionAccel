@@ -19,6 +19,8 @@ Imports:
     pagedown,
     pagedreport (>= 0.1),
     readr,
+    redcapAPI,
+    rlang,
     rmarkdown,
     scales,
     tidyr
