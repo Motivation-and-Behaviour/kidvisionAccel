@@ -5,16 +5,27 @@ pinned_versions <- c(GGIR = "3.3-9", GGIRread = "1.0.11")
 
 enrolment_event <- "enrolment_arm_1"
 
-# Study timepoints. `folder_pattern` matches the timepoint folder names on
-# OneDrive (case-insensitive), which vary in practice ("Time_1", "Time1",
-# "Time 1"). The accelerometer is fitted at visit 1 and collected at visit 2,
-# and the accelerometer instruments live on the visit 2 event.
-timepoints <- tibble::tribble(
-  ~timepoint, ~folder_pattern, ~visit1_event, ~visit2_event,
-  "baseline", "^baseline$", "baseline_visit_1_arm_1", "baseline_visit_2_arm_1",
-  "12m", "^time[ _-]?1$", "12m_visit_1_arm_1", "12m_visit_2_arm_1",
-  "24m", "^time[ _-]?2$", "24m_visit_1_arm_1", "24m_visit_2_arm_1"
+# Study timepoints. `folder` is the timepoint folder's name on OneDrive
+# (matched ignoring case). `misnamed_pattern` catches variants such as "Time 1",
+# "Time1" or "Time_1 - Copy", which are reported for renaming rather than
+# used. The accelerometer is fitted at visit 1 and collected at visit 2, and the
+# accelerometer instruments live on the visit 2 event.
+timepoint_map <- tibble::tribble(
+  ~timepoint, ~folder, ~misnamed_pattern, ~visit1_event, ~visit2_event,
+  "baseline", "Baseline", "^base[ _-]?line",
+  "baseline_visit_1_arm_1", "baseline_visit_2_arm_1",
+  "12m", "Time_1", "^time[ _-]?1(\\D|$)",
+  "12m_visit_1_arm_1", "12m_visit_2_arm_1",
+  "24m", "Time_2", "^time[ _-]?2(\\D|$)",
+  "24m_visit_1_arm_1", "24m_visit_2_arm_1"
 )
+
+# The folder holding the raw files within each timepoint folder.
+accel_folder <- "Accelerometer"
+
+# Subfolders of the accelerometer folder with this name are ignored, so files
+# that should not be processed can be set aside without deleting them.
+excluded_folder <- "Excluded"
 
 #' Configure a KidVision processing run
 #'

@@ -258,7 +258,9 @@ check_redcap_fields <- function(metadata, dry_run) {
 }
 
 check_redcap_events <- function(events) {
-  needed <- c(enrolment_event, timepoints$visit1_event, timepoints$visit2_event)
+  needed <- c(
+    enrolment_event, timepoint_map$visit1_event, timepoint_map$visit2_event
+  )
   missing <- setdiff(needed, events$unique_event_name)
   if (length(missing) > 0) {
     return(check_result("REDCap events", "fail", glue::glue(

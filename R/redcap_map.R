@@ -53,6 +53,14 @@ read_fields <- c(
   "sop_date", "sop2_date", "sop2_postchecklist", "cac_gen_num"
 )
 
+# Exported by kv_pending() to decide what to process.
+pending_fields <- c(
+  "record_id", "consent_geneactiv", "withdrawn_existingdata",
+  "dropout_existingdata", "sop_date", "sop2_date", "sop2_postchecklist",
+  "cac_gen_num", file_fields, "cac_proc_status", "cac_proc_ggir",
+  "cac_proc_params"
+)
+
 redcap_fields <- function() {
   day_fields <- unlist(lapply(
     seq_len(n_measurement_days),

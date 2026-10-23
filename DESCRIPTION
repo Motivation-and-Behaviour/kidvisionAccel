@@ -20,7 +20,7 @@ Depends:
     R (>= 4.1.0)
 Imports:
     cli,
-    dplyr,
+    dplyr (>= 1.1.0),
     fs,
     GGIR (>= 3.3-9),
     GGIRread (>= 1.0.11),
@@ -28,7 +28,7 @@ Imports:
     ps,
     purrr,
     redcapAPI,
-    rlang,
+    rlang (>= 1.1.0),
     tibble
 Suggests:
     testthat (>= 3.0.0),

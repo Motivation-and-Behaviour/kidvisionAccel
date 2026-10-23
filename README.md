@@ -6,8 +6,9 @@ raw GENEActiv files from OneDrive, runs a pinned version of
 [GGIR](https://github.com/wadpac/GGIR), writes the results back to REDCap, and
 creates a report for each family.
 
-> **Status:** under active development. Only setup checks are available so
-> far; processing, REDCap import and reports are being added in stages.
+> **Status:** under active development. Setup checks and finding and copying
+> raw files are available; processing, REDCap import and reports are being
+> added in stages.
 
 ## Setup
 
@@ -48,18 +49,56 @@ Settings can be overridden with these environment variables:
 
 ## Usage
 
-Check that everything is in place:
+Check that everything is in place, then find the recordings to process and
+copy their files:
 
 ``` r
 library(kidvisionAccel)
 kv_check()
+
+jobs <- kv_pending()      # recordings that need processing, from REDCap
+jobs <- kv_locate(jobs)   # find their files on OneDrive (nothing downloaded)
+jobs <- kv_fetch(jobs)    # copy and check the files
 ```
 
-## REDCap fields to add
+Each step returns the job table, with one row per recording. `status` shows
+how far each recording got, and `message` says why it stopped.
 
-The pipeline records its progress in these fields, which need to be added
-by hand to the `accelerometer_output` instrument. The pipeline never changes
-the REDCap project's design itself.
+To list OneDrive folders that need renaming or fixing:
+
+``` r
+kv_audit_folders()
+```
+
+## OneDrive folders
+
+Raw files are expected in
+`<record_id>/<Baseline|Time_1|Time_2>/Accelerometer/`. Files in subfolders of
+`Accelerometer` are used too, except in a subfolder called `Excluded`, which
+is the place for files that shouldn't be processed. Folders with other names
+(such as `Time 1` or `Accelerometers`) are reported rather than guessed at.
+
+When a recording has more than one `.bin` file:
+
+* copies of the same file are ignored;
+* if each device started 24 hours or more after the one before, and no more
+  than 3 days after it stopped, it's a device swap, and the files are joined
+  into one recording;
+* devices started less than 24 hours apart might have been worn at the same
+  time, for example by a parent, and a device started more than 3 days after
+  the previous one stopped looks like a second attempt, so these recordings
+  are held for review. Move the files that shouldn't be used into
+  `Excluded`.
+
+Start and stop times come from inside the files, so these checks happen
+after copying. The time in a GENEActiv file's name is when it was downloaded,
+not when it started recording.
+
+## REDCap processing fields
+
+The pipeline records its progress in these fields on the
+`accelerometer_output` instrument. They were added by hand: the pipeline
+never changes the REDCap project's design itself.
 
 | Field | Type | Label | Validation / choices |
 | --- | --- | --- | --- |

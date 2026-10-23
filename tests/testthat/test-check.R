@@ -4,7 +4,7 @@ fake_metadata <- function(drop = character()) {
 
 fake_events <- function() {
   data.frame(unique_event_name = c(
-    enrolment_event, timepoints$visit1_event, timepoints$visit2_event
+    enrolment_event, timepoint_map$visit1_event, timepoint_map$visit2_event
   ))
 }
 

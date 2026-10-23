@@ -19,6 +19,20 @@ covers the foundation stage.
   and the REDCap connection, fields, events and identifier access.
 * `ggir_params()` is the single, snapshot-tested source of GGIR settings, and
   `ggir_params_hash()` identifies them.
+* `kv_pending()` reads REDCap to find recordings that need processing (step
+  1). It skips recordings without consent or where data removal was
+  requested, and can select recordings to reprocess after a GGIR or settings
+  change.
+* `kv_locate()` finds each recording's `.bin` files on OneDrive from folder
+  listings and file names only. It reports misnamed folders, copies of the
+  same file, files labelled as another participant, and files downloaded
+  before visit 1 (step 2).
+* `kv_fetch()` copies the files to the work folder with retries and checks
+  them before processing: size, completeness and the device's timezone.
+  Files from a device swap are appended. Devices started within 24 hours of
+  each other, or more than 3 days after the previous one stopped, need
+  review (step 2).
+* `kv_audit_folders()` lists OneDrive folders to rename or fix.
 
 ## Processing changes
 
