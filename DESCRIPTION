@@ -23,13 +23,17 @@ Imports:
     cli,
     dplyr (>= 1.1.0),
     fs,
+    ggplot2,
     GGIR (>= 3.3-9),
     GGIRread (>= 1.0.11),
     glue,
+    jsonlite,
     ps,
     purrr,
+    ragg,
     redcapAPI,
     rlang (>= 1.1.0),
+    systemfonts,
     tibble
 Suggests:
     testthat (>= 3.0.0),

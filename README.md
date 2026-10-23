@@ -6,9 +6,9 @@ raw GENEActiv files from OneDrive, runs a pinned version of
 [GGIR](https://github.com/wadpac/GGIR), writes the results back to REDCap, and
 creates a report for each family.
 
-> **Status:** under active development. Everything up to running GGIR and
-> preparing the REDCap values is available; writing to REDCap and the
-> participant reports are being added in stages.
+> **Status:** under active development. Everything up to creating the
+> participant reports is available; writing to REDCap and the single
+> `kv_run()` entry point are being added in stages.
 
 ## Setup
 
@@ -61,12 +61,18 @@ jobs <- kv_locate(jobs)   # find their files on OneDrive (nothing downloaded)
 jobs <- kv_fetch(jobs)    # copy and check the files
 jobs <- kv_process(jobs)  # run GGIR
 jobs <- kv_collate(jobs)  # merge GGIR's results and prepare REDCap values
+jobs <- kv_report(jobs)   # create the participant reports
 ```
 
 GGIR takes about 3 minutes per recording. Its messages are saved in
 `logs/` in the work folder, and each recording's files are in
 `jobs/<record_id>_<timepoint>/`: the copied raw files in `raw/`, GGIR's
-output in `ggir/`, and the files for REDCap in `out/`.
+output in `ggir/`, and the files for REDCap, including the report, in
+`out/`.
+
+The report's wording and layout are in `inst/report/report.typ`, a
+[Typst](https://typst.app/docs/) template; the charts are drawn in
+`R/report_charts.R`.
 
 Each step returns the job table, with one row per recording. `status` shows
 how far each recording got, and `message` says why it stopped.
@@ -109,7 +115,7 @@ never changes the REDCap project's design itself.
 
 | Field | Type | Label | Validation / choices |
 | --- | --- | --- | --- |
-| `cac_proc_status` | Dropdown | Processing status | `0, In progress \| 1, Complete \| 2, Complete - check notes \| 3, No file found \| 4, No valid days \| 5, Failed (will retry) \| 6, Needs manual review` |
+| `cac_proc_status` | Dropdown | Processing status | `0, In progress \| 1, Complete \| 2, Complete - check notes \| 3, No file found \| 4, No valid days \| 5, Failed (will retry) \| 6, Needs manual review \| 7, Failed (cannot be processed)` |
 | `cac_proc_datetime` | Text | Processed at (Sydney time) | Datetime w/ seconds (Y-M-D H:M:S) |
 | `cac_proc_ggir` | Text | GGIR version | |
 | `cac_proc_pkg` | Text | kidvisionAccel version | |

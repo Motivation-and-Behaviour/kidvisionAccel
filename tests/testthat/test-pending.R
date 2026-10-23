@@ -51,14 +51,15 @@ test_that("recording_states() works out each recording's state", {
     enrolled("5"), visit2("5", cac_proc_status = "5"),
     enrolled("6"), visit2("6", cac_proc_status = "3"),
     enrolled("7"), visit2("7", cac_proc_status = "6"),
-    enrolled("8"), visit2("8", sop2_date = NA)
+    enrolled("8"), visit2("8", sop2_date = NA),
+    enrolled("9"), visit2("9", cac_proc_status = "7")
   )
   states <- recording_states(records)
 
-  expect_equal(states$record_id, as.character(1:8))
+  expect_equal(states$record_id, as.character(1:9))
   expect_equal(states$state, c(
     "new", "complete", "complete", "in progress", "failed", "no file",
-    "needs review", "not yet visited"
+    "needs review", "not yet visited", "cannot be processed"
   ))
   expect_equal(states$visit1_date[1], as.Date("2025-03-10"))
   expect_equal(states$visit2_date[1], as.Date("2025-03-18"))

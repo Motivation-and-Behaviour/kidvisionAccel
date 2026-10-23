@@ -48,7 +48,7 @@ status_fields <- c(
 
 # Read to decide what to process and to personalise the report.
 read_fields <- c(
-  "cid_namef", "pid_namef", "cid_dob", "consent_geneactiv",
+  "cid_namef", "pid_namef", "cid_dob", "consent_geneactiv", "consent_camera",
   "withdrawn_existingdata", "dropout_existingdata",
   "sop_date", "sop2_date", "sop2_postchecklist", "cac_gen_num"
 )

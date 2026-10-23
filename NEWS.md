@@ -40,6 +40,18 @@ covers the foundation stage.
 * `kv_collate()` writes one CSV per GGIR part (2, 4, 5 and 6) for REDCap,
   builds a table of measurement days, and prepares the values for REDCap's
   accelerometer instruments (step 4).
+* `kv_report()` creates a PDF report for each child and their family (step
+  5), replacing the R Markdown and pagedown report. It is a Typst template
+  (`inst/report/report.typ`) compiled by the Typst bundled with Quarto, so
+  Chrome is no longer needed. The report:
+  * shows dates rather than weekdays, so recordings longer than a week are
+    shown correctly (#6);
+  * adds an at-a-glance page, an average 24-hour day and a sleep timing
+    chart;
+  * compares each night's sleep period with the age-appropriate guideline,
+    showing how much of it was scored as asleep;
+  * no longer calls 80% sleep efficiency the target, as wrist-worn monitors
+    score restless sleep as wake.
 
 ## Processing changes
 

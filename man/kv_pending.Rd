@@ -43,8 +43,8 @@ status (\code{cac_proc_status}) and \code{reprocess}:
 \item \code{"none"}: recordings that have never been processed, were interrupted
 part-way, or failed. Recordings where no file was found are selected
 again once a \code{.bin} file appears in their folder. Recordings that need
-manual review or had no valid days are only selected when named in
-\code{ids}.
+manual review, had no valid days, or can't be processed are only
+selected when named in \code{ids}.
 \item \code{"outdated"}: as for \code{"none"}, plus completed recordings processed with a
 different GGIR version or different GGIR settings. This includes
 recordings processed before the status fields existed.

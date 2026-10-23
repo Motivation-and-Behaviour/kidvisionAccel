@@ -10,6 +10,7 @@
 #   ready         raw files copied and checked by kv_fetch()
 #   processed     GGIR ran by kv_process()
 #   collated      results merged and REDCap values prepared by kv_collate()
+#   reported      participant report created by kv_report()
 #   no_folder     no folder for the participant or timepoint
 #   no_files      no accelerometer folder, or no .bin files in it
 #   misnamed      a folder needs renaming on OneDrive before it can be used
@@ -18,11 +19,12 @@
 #   copy_failed   copying from OneDrive failed; it will be retried next run
 #   ggir_failed   GGIR stopped with an error or didn't finish
 #   no_valid_days GGIR found no day with enough wear to use
+#   report_failed the report couldn't be created; it will be retried
 
 job_statuses <- c(
-  "pending", "located", "ready", "processed", "collated", "no_folder",
-  "no_files", "misnamed", "needs_review", "invalid_file", "copy_failed",
-  "ggir_failed", "no_valid_days"
+  "pending", "located", "ready", "processed", "collated", "reported",
+  "no_folder", "no_files", "misnamed", "needs_review", "invalid_file",
+  "copy_failed", "ggir_failed", "no_valid_days", "report_failed"
 )
 
 add_note <- function(jobs, i, note) {
@@ -51,7 +53,8 @@ report_jobs <- function(jobs, step, rows = seq_len(nrow(jobs))) {
   cli::cli_inform(c("v" = paste0(step, ": ", summary, ".")))
 
   actionable <- c(
-    "misnamed", "needs_review", "invalid_file", "copy_failed", "ggir_failed"
+    "misnamed", "needs_review", "invalid_file", "copy_failed", "ggir_failed",
+    "report_failed"
   )
   problems <- jobs[intersect(rows, which(jobs$status %in% actionable)), ]
   if (nrow(problems) > 0) {

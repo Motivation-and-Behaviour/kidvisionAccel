@@ -13,8 +13,8 @@
 #' * `"none"`: recordings that have never been processed, were interrupted
 #'   part-way, or failed. Recordings where no file was found are selected
 #'   again once a `.bin` file appears in their folder. Recordings that need
-#'   manual review or had no valid days are only selected when named in
-#'   `ids`.
+#'   manual review, had no valid days, or can't be processed are only
+#'   selected when named in `ids`.
 #' * `"outdated"`: as for `"none"`, plus completed recordings processed with a
 #'   different GGIR version or different GGIR settings. This includes
 #'   recordings processed before the status fields existed.
@@ -148,6 +148,7 @@ recording_states <- function(records) {
     recordings$proc_status == 4 ~ "no valid days",
     recordings$proc_status == 5 ~ "failed",
     recordings$proc_status == 6 ~ "needs review",
+    recordings$proc_status == 7 ~ "cannot be processed",
     .default = "unknown status"
   )
   recordings$outdated <- recordings$state == "complete" & (
@@ -168,7 +169,8 @@ select_recordings <- function(recordings, reprocess, ids, timepoints) {
   selected <- state %in% c("new", "in progress", "failed") |
     (state == "no file" & recordings$has_new_file)
   if (!is.null(ids)) {
-    selected <- selected | state %in% c("no valid days", "needs review")
+    selected <- selected |
+      state %in% c("no valid days", "needs review", "cannot be processed")
   }
   if (reprocess == "outdated") {
     selected <- selected | recordings$outdated
