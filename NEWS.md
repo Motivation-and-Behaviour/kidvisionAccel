@@ -52,6 +52,16 @@ covers the foundation stage.
     showing how much of it was scored as asleep;
   * no longer calls 80% sleep efficiency the target, as wrist-worn monitors
     score restless sleep as wake.
+* `kv_write()` writes the results, the part files and the report to REDCap
+  (step 6), and records a processing status for every recording, including
+  those that couldn't be processed. Values are checked against the project
+  first, so a value REDCap would reject stops the recording instead of being
+  imported as a blank. The status is set to "In progress" first and only
+  marked complete at the end, so an interrupted run is picked up again. A
+  dry run saves what would be written instead.
+* `kv_cleanup()` deletes the local copies (step 7).
+* `kv_run()` runs the whole workflow, processing several recordings at once
+  with `workers`, and saves a log of each run.
 
 ## Processing changes
 

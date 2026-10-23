@@ -36,7 +36,8 @@ fake_jobs <- function(record_id, timepoint = "baseline", visit1_date = NA,
     device_num = rep_len(device_num, n),
     status = "pending",
     message = NA_character_,
-    notes = rep(list(character()), n)
+    notes = rep(list(character()), n),
+    check_notes = rep(FALSE, n)
   )
 }
 

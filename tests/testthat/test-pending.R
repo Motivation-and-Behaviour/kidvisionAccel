@@ -101,6 +101,13 @@ test_that("completed recordings are outdated after a GGIR or settings change", {
   expect_equal(recording_states(records)$outdated, c(FALSE, TRUE, TRUE, TRUE))
 })
 
+test_that("versions match however they're written", {
+  expect_equal(
+    same_version(c("3.3.9", "3.3-9", "3.1-4", NA, "unknown"), "3.3-9"),
+    c(TRUE, TRUE, FALSE, FALSE, FALSE)
+  )
+})
+
 test_that("select_recordings() applies the reprocess modes", {
   recordings <- tibble::tibble(
     record_id = as.character(1:9),
@@ -164,7 +171,7 @@ test_that("kv_pending() returns a job table of recordings to process", {
   expect_named(jobs, c(
     "record_id", "timepoint", "event", "reason", "visit1_date",
     "visit2_date", "accel_downloaded", "device_num", "status", "message",
-    "notes"
+    "notes", "check_notes"
   ))
 })
 

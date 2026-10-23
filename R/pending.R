@@ -152,7 +152,7 @@ recording_states <- function(records) {
     .default = "unknown status"
   )
   recordings$outdated <- recordings$state == "complete" & (
-    !recordings$proc_ggir %in% pinned_versions[["GGIR"]] |
+    !same_version(recordings$proc_ggir, pinned_versions[["GGIR"]]) |
       !recordings$proc_params %in% ggir_params_hash()
   )
 
@@ -162,6 +162,13 @@ recording_states <- function(records) {
     match(recordings$timepoint, timepoint_map$timepoint)
   )
   recordings[order, ]
+}
+
+# Whether each version in `x` is `version`, however it's written: R reports
+# GGIR 3.3-9 as "3.3.9". Missing or unreadable versions are not.
+same_version <- function(x, version) {
+  parsed <- suppressWarnings(package_version(x, strict = FALSE))
+  (parsed == package_version(version)) %in% TRUE
 }
 
 select_recordings <- function(recordings, reprocess, ids, timepoints) {
@@ -227,6 +234,7 @@ new_job_table <- function(recordings) {
     device_num = recordings$device_num,
     status = rep("pending", nrow(recordings)),
     message = rep(NA_character_, nrow(recordings)),
-    notes = rep(list(character()), nrow(recordings))
+    notes = rep(list(character()), nrow(recordings)),
+    check_notes = rep(FALSE, nrow(recordings))
   )
 }

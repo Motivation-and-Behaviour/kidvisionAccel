@@ -251,12 +251,6 @@ check_files <- function(files, record_id) {
     )))
   }
 
-  if (nrow(files) > 1) {
-    notes <- c(notes, glue::glue(
-      "{nrow(files)} files; how they are combined is decided once copied."
-    ))
-  }
-
   outcome("located")
 }
 

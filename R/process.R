@@ -5,7 +5,8 @@
 #'
 #' Each recording is processed in its own R process and a new, empty output
 #' folder, so a file that crashes GGIR, or takes longer than `timeout`
-#' minutes, stops only that recording. GGIR's messages are saved to
+#' minutes, stops only that recording. Up to `workers` recordings are
+#' processed at once. GGIR's messages are saved to
 #' `logs/<record_id>_<timepoint>_ggir.log` in the work folder.
 #'
 #' When the visit dates are plausible (visit 2 is 5 to 21 days after visit 1,
@@ -22,6 +23,8 @@
 #' @param config A [kv_config()] object.
 #' @param timeout Minutes to allow GGIR for each recording. A 9-day
 #'   recording usually takes 3 to 5 minutes.
+#' @param workers How many recordings to process at once. Each needs about
+#'   3 GB of memory.
 #'
 #' @return The job table, with GGIR's output folder in `ggir_dir` and the
 #'   period it used in `study_first` and `study_last` (`NA` for the whole
@@ -29,7 +32,8 @@
 #'   others have status `"ggir_failed"`, `"invalid_file"`, `"needs_review"` or
 #'   `"no_valid_days"`.
 #' @export
-kv_process <- function(jobs, config = kv_config(), timeout = 60) {
+kv_process <- function(jobs, config = kv_config(), timeout = 60,
+                       workers = config$workers) {
   if (!"ggir_dir" %in% names(jobs)) jobs$ggir_dir <- NA_character_
   if (!"study_first" %in% names(jobs)) jobs$study_first <- as.Date(NA)
   if (!"study_last" %in% names(jobs)) jobs$study_last <- as.Date(NA)
@@ -37,12 +41,22 @@ kv_process <- function(jobs, config = kv_config(), timeout = 60) {
   log_dir <- file.path(config$work_dir, "logs")
   fs::dir_create(log_dir)
 
+  runs <- list()
+  for (i in rows) {
+    prepared <- prepare_ggir(jobs, i, config, log_dir)
+    jobs <- prepared$jobs
+    runs[[length(runs) + 1]] <- prepared$run
+  }
+  errors <- run_ggir_jobs(runs, workers, timeout)
+
   for (k in seq_along(rows)) {
     i <- rows[[k]]
-    cli::cli_inform(c(
-      "i" = "Running GGIR on {job_name(jobs, i)} ({k} of {length(rows)})."
-    ))
-    jobs <- process_job(jobs, i, config, log_dir, timeout)
+    jobs$ggir_dir[[i]] <- runs[[k]]$ggir_dir
+    outcome <- check_ggir_output(
+      runs[[k]]$ggir_dir, jobs$record_id[[i]], nrow(jobs$files[[i]]),
+      errors[[k]], runs[[k]]$log
+    )
+    jobs <- set_status(jobs, i, outcome$status, outcome$message)
   }
 
   report_jobs(jobs, "GGIR", rows)
@@ -52,7 +66,9 @@ job_name <- function(jobs, i) {
   paste0(jobs$record_id[[i]], "_", jobs$timepoint[[i]])
 }
 
-process_job <- function(jobs, i, config, log_dir, timeout) {
+# Sets up GGIR's output folder and arguments for job `i`. Returns the updated
+# job table and the run: GGIR's arguments, log file and output folder.
+prepare_ggir <- function(jobs, i, config, log_dir) {
   name <- job_name(jobs, i)
   out_dir <- file.path(jobs$job_dir[[i]], "ggir")
   if (fs::dir_exists(out_dir)) fs::dir_delete(out_dir)
@@ -82,27 +98,76 @@ process_job <- function(jobs, i, config, log_dir, timeout) {
     jobs$study_last[[i]] <- dates$last
     jobs <- add_note(jobs, i, glue::glue(
       "Used data from {dates$first} to {dates$last} (visit 1 to visit 2)."
-    ))
+    ), check = FALSE)
   } else {
     jobs <- add_note(jobs, i, glue::glue(
       "Used the whole recording, as {dates$reason}."
     ))
   }
 
-  log <- file.path(log_dir, paste0(name, "_ggir.log"))
-  error <- tryCatch(
-    {
-      run_ggir(args, log, timeout)
-      NULL
-    },
-    error = function(e) e
+  run <- list(
+    name = name,
+    args = args,
+    log = file.path(log_dir, paste0(name, "_ggir.log")),
+    ggir_dir = file.path(out_dir, paste0("output_", name))
   )
+  list(jobs = jobs, run = run)
+}
 
-  jobs$ggir_dir[[i]] <- file.path(out_dir, paste0("output_", name))
-  outcome <- check_ggir_output(
-    jobs$ggir_dir[[i]], jobs$record_id[[i]], nrow(files), error, log
+# Runs GGIR for each run, `workers` at a time, each in its own R process.
+# Returns, for each run, NULL if GGIR finished or the error it stopped with.
+run_ggir_jobs <- function(runs, workers, timeout) {
+  errors <- vector("list", length(runs))
+  queue <- seq_along(runs)
+  running <- integer()
+  processes <- list()
+  started <- numeric(length(runs))
+
+  while (length(queue) > 0 || length(running) > 0) {
+    while (length(running) < workers && length(queue) > 0) {
+      k <- queue[[1]]
+      queue <- queue[-1]
+      cli::cli_inform(c(
+        "i" = "Running GGIR on {runs[[k]]$name} ({k} of {length(runs)})."
+      ))
+      processes[[k]] <- start_ggir(runs[[k]]$args, runs[[k]]$log)
+      started[[k]] <- as.numeric(Sys.time())
+      running <- c(running, k)
+    }
+    for (k in running) {
+      process <- processes[[k]]
+      if (!process$is_alive()) {
+        errors[k] <- list(tryCatch(
+          {
+            process$get_result()
+            NULL
+          },
+          error = function(e) e
+        ))
+        running <- setdiff(running, k)
+      } else if (as.numeric(Sys.time()) - started[[k]] > timeout * 60) {
+        process$kill_tree()
+        errors[[k]] <- structure(
+          class = c("callr_timeout_error", "error", "condition"),
+          list(message = "GGIR timed out", call = NULL)
+        )
+        running <- setdiff(running, k)
+      }
+    }
+    if (length(running) > 0) Sys.sleep(0.5)
+  }
+  errors
+}
+
+# Starts GGIR in a background R process, with its messages going to `log`.
+start_ggir <- function(args, log) {
+  callr::r_bg(
+    function(args) do.call(GGIR::GGIR, args),
+    args = list(args = args),
+    stdout = log,
+    stderr = "2>&1",
+    supervise = TRUE
   )
-  set_status(jobs, i, outcome$status, outcome$message)
 }
 
 # Judges whether GGIR processed a recording, from its output and any error.
@@ -223,17 +288,6 @@ read_ggir_csv <- function(path) {
 }
 
 as_number <- function(x) suppressWarnings(as.numeric(x))
-
-# Runs GGIR in a separate R process, saving its messages to `log`.
-run_ggir <- function(args, log, timeout) {
-  callr::r(
-    function(args) do.call(GGIR::GGIR, args),
-    args = list(args = args),
-    stdout = log,
-    stderr = "2>&1",
-    timeout = timeout * 60
-  )
-}
 
 # The period GGIR should use: visit 1 to visit 2, if those dates are
 # plausible. Otherwise `reason` says why the whole recording is used.

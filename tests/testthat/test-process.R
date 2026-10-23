@@ -121,12 +121,14 @@ ready_job <- function(work_dir, visit1 = NA, visit2 = NA) {
 test_that("kv_process() runs GGIR and checks its output", {
   work_dir <- withr::local_tempdir()
   calls <- list()
-  local_mocked_bindings(run_ggir = function(args, log, timeout) {
+  # Stands in for GGIR: copies its output for the synthetic recording
+  local_mocked_bindings(start_ggir = function(args, log) {
     calls[[length(calls) + 1]] <<- args
     fs::dir_copy(
-      local_ggir_output(),
+      local_ggir_output(env = parent.frame(3)),
       file.path(args$outputdir, paste0("output_", args$studyname))
     )
+    callr::r_bg(function() NULL)
   })
   jobs <- ready_job(work_dir, "2016-06-23", "2016-06-30")
 
@@ -152,9 +154,9 @@ test_that("kv_process() runs GGIR and checks its output", {
 
 test_that("kv_process() uses the whole recording without plausible dates", {
   work_dir <- withr::local_tempdir()
-  local_mocked_bindings(run_ggir = function(args, log, timeout) {
+  local_mocked_bindings(start_ggir = function(args, log) {
     expect_null(args$study_dates_file)
-    stop("GGIR crashed")
+    callr::r_bg(function() stop("GGIR crashed"))
   })
 
   jobs <- suppressMessages(
@@ -164,4 +166,59 @@ test_that("kv_process() uses the whole recording without plausible dates", {
   expect_equal(jobs$status, "ggir_failed")
   expect_match(jobs$message, "GGIR crashed")
   expect_match(jobs$notes[[1]], "whole recording, as a visit date is missing")
+})
+
+# Background processes that stand in for GGIR: each run's `args` say how long
+# to take and whether to fail.
+local_fake_ggir <- function(env = parent.frame()) {
+  local_mocked_bindings(
+    start_ggir = function(args, log) {
+      callr::r_bg(
+        function(wait, fail) {
+          Sys.sleep(wait)
+          if (fail) stop("bad file")
+        },
+        args = list(wait = args$wait, fail = args$fail)
+      )
+    },
+    .env = env
+  )
+}
+
+fake_run <- function(name, wait = 0, fail = FALSE) {
+  list(name = name, args = list(wait = wait, fail = fail), log = "x.log")
+}
+
+test_that("run_ggir_jobs() runs recordings in parallel", {
+  local_fake_ggir()
+  runs <- list(fake_run("a", 2), fake_run("b", 2), fake_run("c", 0))
+
+  started <- Sys.time()
+  errors <- suppressMessages(run_ggir_jobs(runs, workers = 3, timeout = 1))
+  elapsed <- as.numeric(Sys.time() - started, units = "secs")
+
+  expect_equal(errors, list(NULL, NULL, NULL))
+  expect_lt(elapsed, 3.5)
+})
+
+test_that("run_ggir_jobs() returns each recording's error", {
+  local_fake_ggir()
+  runs <- list(fake_run("a"), fake_run("b", fail = TRUE))
+
+  errors <- suppressMessages(run_ggir_jobs(runs, workers = 1, timeout = 1))
+
+  expect_null(errors[[1]])
+  expect_match(conditionMessage(errors[[2]]$parent), "bad file")
+})
+
+test_that("run_ggir_jobs() stops recordings that take too long", {
+  local_fake_ggir()
+  runs <- list(fake_run("slow", wait = 30), fake_run("quick"))
+
+  errors <- suppressMessages(
+    run_ggir_jobs(runs, workers = 2, timeout = 2 / 60)
+  )
+
+  expect_s3_class(errors[[1]], "callr_timeout_error")
+  expect_null(errors[[2]])
 })

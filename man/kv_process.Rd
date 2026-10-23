@@ -4,7 +4,7 @@
 \alias{kv_process}
 \title{Process recordings with GGIR}
 \usage{
-kv_process(jobs, config = kv_config(), timeout = 60)
+kv_process(jobs, config = kv_config(), timeout = 60, workers = config$workers)
 }
 \arguments{
 \item{jobs}{A job table from \code{\link[=kv_fetch]{kv_fetch()}}.}
@@ -13,6 +13,9 @@ kv_process(jobs, config = kv_config(), timeout = 60)
 
 \item{timeout}{Minutes to allow GGIR for each recording. A 9-day
 recording usually takes 3 to 5 minutes.}
+
+\item{workers}{How many recordings to process at once. Each needs about
+3 GB of memory.}
 }
 \value{
 The job table, with GGIR's output folder in \code{ggir_dir} and the
@@ -28,7 +31,8 @@ each recording copied by \code{\link[=kv_fetch]{kv_fetch()}}.
 \details{
 Each recording is processed in its own R process and a new, empty output
 folder, so a file that crashes GGIR, or takes longer than \code{timeout}
-minutes, stops only that recording. GGIR's messages are saved to
+minutes, stops only that recording. Up to \code{workers} recordings are
+processed at once. GGIR's messages are saved to
 \verb{logs/<record_id>_<timepoint>_ggir.log} in the work folder.
 
 When the visit dates are plausible (visit 2 is 5 to 21 days after visit 1,

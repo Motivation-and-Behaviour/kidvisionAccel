@@ -69,7 +69,6 @@ test_that("recording_files() searches subfolders except Excluded", {
 
   expect_equal(found$status, "located")
   expect_setequal(found$files$serial, c("035318", "029385"))
-  expect_match(found$notes, "2 files")
 })
 
 test_that("recording_files() ignores empty files and copies", {
