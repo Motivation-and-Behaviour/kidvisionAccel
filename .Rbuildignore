@@ -1,7 +1,6 @@
-^kidvisionAccel\.Rproj$
-^\.Rproj\.user$
 ^LICENSE\.md$
 ^\.devcontainer$
-^install_chrome\.sh$
-^TRUE$
+^\.github$
+^\.lintr$
 ^\.Renviron$
+^\.env$

@@ -1,0 +1,382 @@
+---
+title: "Processing KidVision accelerometer data"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Processing KidVision accelerometer data}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+kidvisionAccel processes the GENEActiv accelerometer recordings from the
+KidVision study. For each recording that hasn't been processed, it:
+
+1. finds the recording in REDCap (`kv_pending()`);
+2. finds its raw files on OneDrive (`kv_locate()`) and copies them to the
+   computer (`kv_fetch()`);
+3. processes them with a pinned version of GGIR (`kv_process()`);
+4. merges GGIR's results and prepares the values for REDCap
+   (`kv_collate()`);
+5. creates a report for the child and their family (`kv_report()`);
+6. writes the values, GGIR's results and the report to REDCap (`kv_write()`);
+7. deletes the local copies (`kv_cleanup()`).
+
+`kv_run()` does all of this in one go. This vignette explains how to set up
+and run the pipeline, how it decides what to process, and the choices behind
+the processing.
+
+## Setting up
+
+The pipeline runs in the devcontainer in the package's repository, under
+WSL2.
+
+1. In WSL, point `KIDVISION_ONEDRIVE` at the synced *Square Eyes - Community
+   Sample* folder by adding a line like this to `~/.profile`:
+
+   ```sh
+   export KIDVISION_ONEDRIVE="/mnt/c/Users/<you>/Australian Catholic University/Square Eyes - Community Sample"
+   ```
+
+   Then restart WSL (`wsl --shutdown` in PowerShell) so VS Code picks it up.
+   The folder is mounted read-only at `/onedrive` in the container. Local
+   copies and results go to `~/kidvision_work` in WSL, mounted at `/work`.
+
+2. Put your REDCap API token in `.env` in the repository:
+
+   ```sh
+   REDCAP_KEY=<your token>
+   ```
+
+   The token's user needs to be able to export identifiers (for the
+   children's and parents' first names in the reports), import records and
+   upload files.
+
+3. Open the repository in the devcontainer. The pinned GGIR and GGIRread
+   versions and the other dependencies are installed when the container is
+   built.
+
+`kv_check()` confirms that everything is in place: the pinned package
+versions, the GGIR settings, the OneDrive folder, free disk space, Quarto
+(which renders the reports), and the REDCap project's fields and events.
+`kv_run()` runs it first anyway.
+
+```{r}
+library(kidvisionAccel)
+kv_check()
+```
+
+## Running the pipeline
+
+To process everything that hasn't been processed yet:
+
+```{r}
+kv_run()
+```
+
+GGIR takes about 3 minutes for each 9-day recording, and copying a file from
+OneDrive a minute or two. To process several recordings at once, set
+`workers` (or `KIDVISION_WORKERS`). Each needs about 3 GB of memory and
+several hundred MB of disk space for its copies.
+
+To try the pipeline without writing to REDCap, use a dry run. What would
+have been written is saved in `dry_run/` in the work folder:
+
+```{r}
+kv_run(ids = c("1009", "4340"), timepoints = "baseline", dry_run = TRUE)
+```
+
+`ids` and `timepoints` limit a run to some recordings. `reprocess` decides
+which already-processed recordings are processed again:
+
+| `reprocess` | Processes |
+| --- | --- |
+| `"none"` (the default) | Recordings never processed, interrupted part-way, or that failed in a way worth retrying, and recordings with no file found once a file appears |
+| `"outdated"` | As for `"none"`, plus completed recordings processed with a different GGIR version or settings |
+| `"all"` | Every recording |
+
+Recordings that need manual review, had no valid days, or can't be
+processed are only tried again when named in `ids`, so fix them first (see
+[Troubleshooting](#troubleshooting)), then run `kv_run(ids = ...)`.
+
+A summary is printed at the end, and `logs/run_<date and time>.csv` in the
+work folder has a row for each recording, with its status and notes. GGIR's
+messages for each recording are in `logs/<record_id>_<timepoint>_ggir.log`.
+Neither contains names.
+
+### Running the steps one at a time
+
+Each step takes and returns the *job table*, with one row per recording.
+`status` shows how far each recording got and `message` says why it stopped.
+This is useful for checking what's outstanding without processing anything:
+
+```{r}
+jobs <- kv_pending()
+jobs <- kv_locate(jobs)  # reads folder listings only, so nothing downloads
+table(jobs$status)
+```
+
+## Organising the files on OneDrive
+
+Each recording's raw files are expected in
+
+```
+<record_id>/<Baseline, Time_1 or Time_2>/Accelerometer/
+```
+
+with `Baseline`, `Time_1` and `Time_2` being the baseline, 12-month and
+24-month visits. Folders with other names, such as `Time 1` or
+`Accelerometers`, aren't guessed at: the recording is held for review with
+the rename needed. `kv_audit_folders()` lists every folder that needs
+fixing, without using REDCap.
+
+`.bin` files in subfolders of `Accelerometer` are used too, except in a
+subfolder called `Excluded`. Moving a file there is the way to stop it being
+used without deleting it.
+
+GENEActiv names files `<subject>__<serial>_<download time>.bin`. Before
+copying anything, the pipeline uses these names to check that:
+
+* the subject code matches the participant;
+* the file wasn't downloaded on or before visit 1, which would mean it is
+  from another timepoint;
+* the same file isn't in more than one recording's folder.
+
+Copies of the same file in one folder are ignored.
+
+### Recordings with more than one file
+
+Sometimes a child wears more than one device during a timepoint. Once the
+files are copied, their headers give when each device started and stopped
+recording:
+
+* If each device started at least 24 hours after the one before, and no
+  more than 3 days after it stopped, the devices were swapped. GGIR joins
+  the files into one recording, using the later device where they overlap.
+* If two devices started within 24 hours of each other, they may have been
+  worn at the same time, for example by a parent. The recording is held for
+  review.
+* If a device started more than 3 days after the one before stopped, it
+  looks like a second attempt at the recording. The recording is held for
+  review.
+
+To resolve a recording held for review, move the files that shouldn't be
+used to an `Excluded` subfolder, then process it again with `ids`.
+
+## What is written to REDCap
+
+For each processed recording, on its visit 2 event:
+
+* the accelerometer details, physical activity, sleep and time instruments
+  are filled in. Any value from earlier processing is replaced, including
+  with a blank, so a reprocessed recording never keeps stale values. The
+  wrist and device number fields (`cac_gen_wrist`, `cac_gen_num`) are
+  entered by research staff and never changed;
+* GGIR's part 2, 4, 5 and 6 results are uploaded to `acc_pt2`, `acc_pt4`,
+  `acc_pt5` and `acc_pt6`, and the report to `reports_accel`;
+* the processing fields record the status, date and time, GGIR and
+  kidvisionAccel versions, a hash of the GGIR settings, the number of files
+  and notes, including the source files used;
+* the physical activity, sleep, time, output and participant report
+  instruments are marked complete. The details instrument isn't, as staff
+  fill in part of it.
+
+The status is set to *In progress* before anything else is written, and
+only set to *Complete* once the values and files are all in REDCap, so an
+interrupted run leaves the recording to be processed again. Every set of
+values is checked against the project before it is imported: a value REDCap
+wouldn't accept stops the recording rather than being imported as a blank.
+
+Recordings that can't be processed have their status and the reason
+recorded, so they aren't tried again on every run:
+
+| Status | Meaning |
+| --- | --- |
+| 0, In progress | A run stopped part-way; processed again on the next run |
+| 1, Complete | Values, files and report are in REDCap |
+| 2, Complete - check notes | As above, with something worth checking in the notes, such as a device swap, more than 10 days, or implausible visit dates |
+| 3, No file found | No folder or `.bin` file; processed again once a file appears |
+| 4, No valid days | No day or night had enough wear |
+| 5, Failed (will retry) | Copying, the report or writing failed, or GGIR ran out of time; processed again on the next run |
+| 6, Needs manual review | A folder needs renaming, or the files need a decision |
+| 7, Failed (cannot be processed) | GGIR couldn't process the file, or it is corrupt or incomplete |
+
+## How recordings are processed
+
+### GGIR version and settings
+
+Different GGIR versions can give different estimates for the same file, so
+the pipeline requires GGIR `r kidvisionAccel:::pinned_versions[["GGIR"]]`
+and GGIRread `r kidvisionAccel:::pinned_versions[["GGIRread"]]` (which reads
+GENEActiv files). `kv_check()` stops a run if other versions are installed.
+
+All the settings are in `ggir_params()`:
+
+```{r settings, eval = TRUE, echo = FALSE}
+params <- kidvisionAccel::ggir_params()
+why <- c(
+  desiredtz = "Days are split at midnight Sydney time",
+  idloc = "Copies are named so the ID is the record ID",
+  maxRecordingInterval = "Joins files from a device swap",
+  nonwear_approach = "Current non-wear detection",
+  nonwear_range_threshold = "GGIR's default, set explicitly",
+  data_masking_strategy = "Midnight-to-midnight days",
+  includedaycrit = "A valid day has 16 hours of wear, in parts 2 and 5",
+  qlevels = "MX metrics, for comparison with Fairclough et al. (2023)",
+  iglevels = "Intensity gradient (Rowlands et al., 2018)",
+  HASPT.algo = "Sleep period from HDCZA (van Hees et al., 2018)",
+  HASIB.algo = "Sleep within it (van Hees et al., 2015)",
+  includenightcrit = "A valid night has 16 hours of wear",
+  threshold.lig = "Hildebrand et al. (2017)",
+  threshold.mod = "Hildebrand et al. (2014)",
+  threshold.vig = "Hildebrand et al. (2014)",
+  timewindow = "Midnight-to-midnight and waking-to-waking days",
+  includedaycrit.part5 = "Two-thirds of waking hours must be valid",
+  part6CR = "Circadian rhythm analysis"
+)
+show <- function(x) {
+  if (is.numeric(x) && length(x) > 6) {
+    paste0(
+      paste(utils::head(signif(x, 4), 3), collapse = ", "), ", ..., ",
+      utils::tail(signif(x, 4), 1), " (", length(x), " values)"
+    )
+  } else {
+    paste(signif_if_numeric(x), collapse = ", ")
+  }
+}
+signif_if_numeric <- function(x) if (is.numeric(x)) signif(x, 4) else x
+knitr::kable(data.frame(
+  Setting = names(params),
+  Value = vapply(params, show, character(1)),
+  Why = ifelse(names(params) %in% names(why), why[names(params)], ""),
+  row.names = NULL
+))
+```
+
+The intensity thresholds are for the GENEActiv worn on the non-dominant
+wrist by children aged 7 to 11. Sedentary time is below the light
+threshold. The sleep settings performed best against polysomnography in
+school-aged children (Meredith-Jones et al., 2024; Chen et al., 2026), and a
+sleep diary didn't improve them (Burkart et al.).
+
+### The period used
+
+Devices are set up shortly before visit 1 and collected at visit 2, so
+REDCap's visit dates (`sop_date` and `sop2_date`) are used to leave out the
+time before the device was handed over and after it was collected. They are
+only used when they look right: visit 2 is 5 to 21 days after visit 1, and
+the recording started on visit 1 or up to 3 days before. Otherwise the
+whole recording is used, and a note says why.
+
+### Measurement days and validity
+
+Measurement day 1 is the first calendar date of the period used. Each day
+has:
+
+* the hours recorded and the hours of valid wear, from GGIR part 2;
+* physical activity, from part 5's midnight-to-midnight window, but only on
+  valid days: at least 16 hours of wear, and at least two-thirds of the
+  waking hours;
+* sleep from the part 4 night that starts on the evening of that day, but
+  only for valid nights.
+
+Averages are over valid days or nights, with weekdays (Monday to Friday)
+and weekend days averaged separately. REDCap has room for 10 days; later
+days are in the uploaded files, and in the averages, but not in REDCap's day
+fields.
+
+## The participant report
+
+The report gives the child's physical activity and sleep against the
+Australian 24-Hour Movement Guidelines: an at-a-glance summary, an average
+24-hour day, physical activity each day, how long and when the child slept,
+and how settled the nights were. Sleep is the whole sleep period, from
+falling asleep to waking, which is what the guidelines describe; the part
+the monitor scored as asleep is shown within it.
+
+The wording and layout are in `inst/report/report.typ`, a
+[Typst](https://typst.app/docs/) template, and the charts are drawn in
+`R/report_charts.R`. The first names and date of birth come from REDCap and
+appear only in the report itself.
+
+## Maintenance
+
+### Changing the GGIR version or settings
+
+1. Update `pinned_versions` in `R/config.R`, and the `Imports` and
+   `Remotes` fields in `DESCRIPTION`, to the new versions, or change the
+   settings in `ggir_params()`.
+2. Read GGIR's NEWS for changes that affect the settings, and check that
+   `kv_check()` still recognises them all.
+3. Update the snapshot test (`testthat::snapshot_accept("ggir")`) and add a
+   NEWS entry.
+4. Install the new versions and rebuild the devcontainer.
+5. Reprocess what was done the old way: `kv_run(reprocess = "outdated")`.
+
+### Tests
+
+`devtools::test()` runs the tests, using synthetic GGIR output and a fake
+REDCap. To also run GGIR on GGIR's own test data, which takes about a
+minute:
+
+```{r}
+Sys.setenv(KIDVISION_INTEGRATION = "true")
+devtools::test(filter = "integration")
+```
+
+## Troubleshooting
+
+The notes in REDCap (`cac_proc_notes`) and the run log say what happened to
+each recording.
+
+* **Needs manual review (6).** Rename the folder, or move the files that
+  shouldn't be used to an `Excluded` subfolder, as the notes describe. Then
+  run `kv_run(ids = ...)`.
+* **No file found (3).** If the files exist somewhere else, move them to the
+  recording's `Accelerometer` folder; the next run picks them up. The notes
+  say if the visit 2 checklist recorded the data as downloaded.
+* **Failed, will retry (5).** Usually OneDrive didn't download a file in
+  time. The next run tries again.
+* **Failed, cannot be processed (7).** The file is corrupt or incomplete, or
+  GGIR stopped with an error; the notes and GGIR's log say which. If a
+  better copy of the file is found, replace it and run with `ids`.
+* **In progress (0)** after a run has finished means the run stopped
+  part-way, for example because REDCap couldn't be reached. The next run
+  processes the recording again.
+
+## References
+
+Burkart S, et al. *Journal of Sleep Research*.
+<https://doi.org/10.1111/jsr.14112>
+
+Chen et al. (2026). *Sleep*.
+<https://pmc.ncbi.nlm.nih.gov/articles/PMC12494141/>
+
+Fairclough SJ, et al. (2023). Reference values for wrist-worn
+accelerometer physical activity metrics in England children and
+adolescents. *International Journal of Behavioral Nutrition and Physical
+Activity*, 20, 35. <https://doi.org/10.1186/s12966-023-01435-z>
+
+Hildebrand M, et al. (2014). Age group comparability of raw accelerometer
+output from wrist- and hip-worn monitors. *Medicine & Science in Sports &
+Exercise*, 46(9), 1816–1824. <https://doi.org/10.1249/MSS.0000000000000289>
+
+Hildebrand M, et al. (2017). Evaluation of raw acceleration sedentary
+thresholds in children and adults. *Scandinavian Journal of Medicine &
+Science in Sports*, 27(12), 1814–1823. <https://doi.org/10.1111/sms.12795>
+
+Meredith-Jones K, et al. (2024). *International Journal of Behavioral
+Nutrition and Physical Activity*, 21, 40.
+<https://doi.org/10.1186/s12966-024-01590-x>
+
+Rowlands AV, et al. (2018). Beyond cut points: accelerometer metrics that
+capture the physical activity profile. *Medicine & Science in Sports &
+Exercise*, 50(6), 1323–1332.
+
+van Hees VT, et al. (2015). A novel, open access method to assess sleep
+duration using a wrist-worn accelerometer. *PLoS ONE*, 10(11), e0142533.
+
+van Hees VT, et al. (2018). Estimating sleep parameters using an
+accelerometer without sleep diary. *Scientific Reports*, 8, 12975.
