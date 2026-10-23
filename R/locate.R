@@ -47,7 +47,17 @@ kv_locate <- function(jobs, config = kv_config()) {
       isTRUE(found$no_participant_folder)
     jobs$folder[[i]] <- found$folder
     jobs$files[i] <- list(found$files)
-    jobs <- set_status(jobs, i, found$status, found$message)
+    message <- found$message
+    # Missing files are more likely a problem when the visit 2 checklist
+    # says the data were downloaded
+    missing <- found$status %in% c("no_folder", "no_files")
+    if (missing && isTRUE(jobs$accel_downloaded[[i]])) {
+      message <- paste(
+        message,
+        "The visit 2 checklist says the accelerometer data were downloaded."
+      )
+    }
+    jobs <- set_status(jobs, i, found$status, message)
     for (note in found$notes) jobs <- add_note(jobs, i, note)
     if (found$status == "located") {
       jobs <- check_download_date(jobs, i)

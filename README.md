@@ -6,6 +6,9 @@ raw GENEActiv files from OneDrive, runs a pinned version of
 [GGIR](https://github.com/wadpac/GGIR), writes the results back to REDCap, and
 creates a report for each family.
 
+`vignette("kidvisionAccel")` explains the pipeline in detail, including the
+GGIR settings and how days and nights are defined.
+
 
 ## Setup
 
@@ -74,83 +77,19 @@ kv_run(reprocess = "outdated")
 ```
 
 A summary is printed at the end, and `logs/run_<date and time>.csv` in the
-work folder has a row for each recording.
+work folder has a row for each recording. Each recording's processing status
+and notes are also recorded in REDCap.
 
-The steps can also be run one at a time. Each takes and returns the job
-table, with one row per recording: `status` shows how far each recording
-got, and `message` says why it stopped.
-
-``` r
-kv_check()
-jobs <- kv_pending()      # recordings that need processing, from REDCap
-jobs <- kv_locate(jobs)   # find their files on OneDrive (nothing downloaded)
-jobs <- kv_fetch(jobs)    # copy and check the files
-jobs <- kv_process(jobs)  # run GGIR
-jobs <- kv_collate(jobs)  # merge GGIR's results and prepare REDCap values
-jobs <- kv_report(jobs)   # create the participant reports
-jobs <- kv_write(jobs)    # write everything to REDCap
-kv_cleanup(jobs)          # delete the local copies
-```
-
-Each recording's local files are in `jobs/<record_id>_<timepoint>/` in the
-work folder until they are cleaned up: the copied raw files in `raw/`, GGIR's
-output in `ggir/`, and the files for REDCap, including the report, in `out/`.
-GGIR's messages are kept in `logs/`.
-
-The report's wording and layout are in `inst/report/report.typ`, a
-[Typst](https://typst.app/docs/) template; the charts are drawn in
-`R/report_charts.R`.
+`vignette("kidvisionAccel")` covers the rest: running the steps one at a
+time, how the OneDrive folders should be organised (and
+`kv_audit_folders()`, which lists folders to fix), what each processing
+status means and what to do about it, and how to change the GGIR version or
+settings.
 
 Copying a file from OneDrive downloads it, and OneDrive then keeps it on the
 computer. To free that space again automatically, turn on Storage Sense in
 Windows and set OneDrive content to become online-only when it hasn't been
 opened for a while.
-
-To list OneDrive folders that need renaming or fixing:
-
-``` r
-kv_audit_folders()
-```
-
-## OneDrive folders
-
-Raw files are expected in
-`<record_id>/<Baseline|Time_1|Time_2>/Accelerometer/`. Files in subfolders of
-`Accelerometer` are used too, except in a subfolder called `Excluded`, which
-is the place for files that shouldn't be processed. Folders with other names
-(such as `Time 1` or `Accelerometers`) are reported rather than guessed at.
-
-When a recording has more than one `.bin` file:
-
-* copies of the same file are ignored;
-* if each device started 24 hours or more after the one before, and no more
-  than 3 days after it stopped, it's a device swap, and the files are joined
-  into one recording;
-* devices started less than 24 hours apart might have been worn at the same
-  time, for example by a parent, and a device started more than 3 days after
-  the previous one stopped looks like a second attempt, so these recordings
-  are held for review. Move the files that shouldn't be used into
-  `Excluded`.
-
-Start and stop times come from inside the files, so these checks happen
-after copying. The time in a GENEActiv file's name is when it was downloaded,
-not when it started recording.
-
-## Processing status in REDCap
-
-The pipeline records what happened to each recording in `cac_proc_status`,
-with the details in `cac_proc_notes`:
-
-| Status | Meaning | What happens next |
-| --- | --- | --- |
-| 0, In progress | A run stopped part-way | Processed again on the next run |
-| 1, Complete | Results, files and report are in REDCap | Only reprocessed if asked (`reprocess`) |
-| 2, Complete - check notes | As above, with something worth checking, such as a device swap or more than 10 days | As above |
-| 3, No file found | No folder or `.bin` file on OneDrive | Processed once a `.bin` file appears |
-| 4, No valid days | No day or night had enough wear | Only when named in `ids` |
-| 5, Failed (will retry) | Copying, GGIR (out of time) or the report failed | Processed again on the next run |
-| 6, Needs manual review | A folder needs renaming, or the files need a decision | Fix on OneDrive, then run with `ids` |
-| 7, Failed (cannot be processed) | GGIR couldn't process the file, or it is corrupt or incomplete | Only when named in `ids` |
 
 ## REDCap processing fields
 

@@ -134,6 +134,20 @@ test_that("kv_locate() locates pending recordings", {
   expect_null(jobs$files[[2]])
 })
 
+test_that("kv_locate() notes missing files the checklist says exist", {
+  source_dir <- local_source(dirs = c("1001/Baseline/Accelerometer", "1002"))
+  jobs <- fake_jobs(c("1001", "1002"))
+  jobs$accel_downloaded <- c(TRUE, FALSE)
+
+  jobs <- suppressMessages(kv_locate(jobs, kv_config(source_dir = source_dir)))
+
+  expect_equal(jobs$message[1], paste(
+    "No .bin files. The visit 2 checklist says the accelerometer data were",
+    "downloaded."
+  ))
+  expect_equal(jobs$message[2], "No Baseline folder.")
+})
+
 test_that("kv_locate() leaves recordings in other statuses alone", {
   source_dir <- local_source(accel())
   jobs <- fake_jobs("1001")

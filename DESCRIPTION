@@ -1,6 +1,6 @@
 Package: kidvisionAccel
 Title: Opinionated Accelerometer Processing and Reporting for the KidVision Project
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R:
     person("Taren", "Sanders", , "taren.sanders@acu.edu.au", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-4504-6008"))
@@ -36,8 +36,11 @@ Imports:
     systemfonts,
     tibble
 Suggests:
+    knitr,
+    rmarkdown,
     testthat (>= 3.0.0),
     withr
+VignetteBuilder: knitr
 Remotes:
     cran/GGIR@3.3-9,
     cran/GGIRread@1.0.11

@@ -1,9 +1,6 @@
-^kidvisionAccel\.Rproj$
-^\.Rproj\.user$
 ^LICENSE\.md$
 ^\.devcontainer$
 ^\.github$
 ^\.lintr$
-^TRUE$
 ^\.Renviron$
 ^\.env$
