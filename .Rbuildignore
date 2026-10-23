@@ -2,6 +2,8 @@
 ^\.Rproj\.user$
 ^LICENSE\.md$
 ^\.devcontainer$
-^install_chrome\.sh$
+^\.github$
+^\.lintr$
 ^TRUE$
 ^\.Renviron$
+^\.env$

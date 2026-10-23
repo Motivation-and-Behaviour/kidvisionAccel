@@ -1,0 +1,8 @@
+linters: linters_with_defaults()
+exclusions: list(
+    # Tests use the package's internal functions, which lintr cannot see.
+    "tests/testthat" = list(object_usage_linter = Inf),
+    # The old report template, which is replaced in a later stage.
+    "inst/report/report_template.Rmd"
+  )
+encoding: "UTF-8"
