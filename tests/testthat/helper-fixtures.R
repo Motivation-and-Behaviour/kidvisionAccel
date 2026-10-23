@@ -70,3 +70,35 @@ replace_raw <- function(raw, old, new) {
   stopifnot(length(at) == 1)
   c(raw[seq_len(at - 1)], charToRaw(new), raw[-seq_len(at - 1 + nchar(old))])
 }
+
+# A copy of GGIR's output for a synthetic 4-day recording (participant 9999),
+# made by running GGIR 3.3-9 with ggir_params() on GGIR's own test data.
+# Result files can be edited, removed or added with `edit`, a function of the
+# results folder. Milestone folders for parts 1 to `stage` are created.
+local_ggir_output <- function(edit = NULL, stage = 6, env = parent.frame()) {
+  ggir_dir <- file.path(withr::local_tempdir(.local_envir = env), "output")
+  fs::dir_copy(test_path("fixtures", "ggir"), ggir_dir)
+  milestones <- c("basic", "ms2.out", "ms3.out", "ms4.out", "ms5.out",
+    "ms6.out")
+  for (m in milestones[seq_len(stage)]) {
+    fs::dir_create(file.path(ggir_dir, "meta", m))
+    file.create(file.path(ggir_dir, "meta", m, "x.RData"))
+  }
+  if (!is.null(edit)) edit(file.path(ggir_dir, "results"))
+  ggir_dir
+}
+
+# Edits one column of a GGIR result CSV.
+edit_result <- function(results, file, column, value) {
+  path <- Sys.glob(file.path(results, file))
+  data <- read_ggir_csv(path)
+  data[[column]] <- value
+  utils::write.csv(data, path, row.names = FALSE, na = "")
+}
+
+# Keeps only the header of a GGIR result CSV.
+empty_result <- function(results, file) {
+  path <- Sys.glob(file.path(results, file))
+  data <- read_ggir_csv(path)
+  utils::write.csv(data[0, ], path, row.names = FALSE)
+}

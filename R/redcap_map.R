@@ -77,3 +77,99 @@ redcap_fields <- function() {
     role = rep(names(roles), lengths(roles))
   )
 }
+
+# The REDCap values for a recording: a one-row data frame with the record ID,
+# event and every derived field, as text. Fields without a value are NA, so an
+# import with overwriting clears any value left from earlier processing.
+to_redcap_record <- function(days, results, record_id, event) {
+  per_day <- lapply(seq_len(n_measurement_days), function(n) {
+    # Indexing past the last day gives a row of NAs
+    values <- day_values(days[if (n <= nrow(days)) n else NA_integer_, ])
+    stats::setNames(values, gsub("{n}", n, names(values), fixed = TRUE))
+  })
+  values <- c(
+    record_id = record_id,
+    redcap_event_name = event,
+    unlist(per_day),
+    summary_values(days, results)
+  )
+  tibble::as_tibble(as.list(values))
+}
+
+day_values <- function(day) {
+  activity <- function(x) format_number(if (isTRUE(day$valid_day)) x else NA, 1)
+  sleep <- function(x, digits) {
+    format_number(if (isTRUE(day$valid_night)) x else NA, digits)
+  }
+  sleep_text <- function(x) if (isTRUE(day$valid_night)) x else NA_character_
+  c(
+    "cac_day{n}_calday" = format(day$date),
+    "cac_day{n}_dotw" = as.character(day$weekday),
+    "cac_day{n}_nhours" = format_number(day$hours, 2),
+    "cac_day{n}_vhours" = format_number(day$valid_hours, 2),
+    "cac_day{n}_full_sed" = activity(day$sedentary),
+    "cac_day{n}_full_lpa" = activity(day$light),
+    "cac_day{n}_full_mpa" = activity(day$moderate),
+    "cac_day{n}_full_vpa" = activity(day$vigorous),
+    "cac_day{n}_full_mvpa" = activity(day$mvpa),
+    "cac_day{n}_noc" = sleep(day$sleep_hours, 2),
+    "cac_day{n}_onset" = sleep(day$onset, 2),
+    "cac_day{n}_onsetts" = sleep_text(day$onset_time),
+    "cac_day{n}_wake" = sleep(day$wake, 2),
+    "cac_day{n}_wakets" = sleep_text(day$wake_time),
+    "cac_day{n}_timeinbed" = sleep(day$sleep_period_hours, 2),
+    "cac_day{n}_eff" = sleep(day$sleep_efficiency, 3)
+  )
+}
+
+summary_values <- function(days, results) {
+  valid <- days[days$valid_day, ]
+  nights <- days[days$valid_night, ]
+  average <- function(x, digits) {
+    format_number(if (any(!is.na(x))) mean(x, na.rm = TRUE) else NA, digits)
+  }
+
+  activity <- c(
+    sed = "sedentary", lpa = "light", mpa = "moderate", vpa = "vigorous",
+    mvpa = "mvpa"
+  )
+  out <- character()
+  for (field in names(activity)) {
+    minutes <- valid[[activity[[field]]]]
+    out[paste0("cac_sum_", field)] <- average(minutes, 1)
+    out[paste0("cac_sum_", field, "wd")] <- average(minutes[!valid$weekend], 1)
+    out[paste0("cac_sum_", field, "we")] <- average(minutes[valid$weekend], 1)
+  }
+
+  person <- results$part2_person
+  out[["cac_sum_enmo"]] <- format_number(
+    as_number(person$`AD_mean_ENMO_mg_0-24hr`), 2
+  )
+  out[["cac_sum_noc"]] <- average(nights$sleep_hours, 2)
+  out[["cac_sum_onset"]] <- average(nights$onset, 2)
+  out[["cac_sum_wake"]] <- average(nights$wake, 2)
+  out[["cac_sum_timeinbed"]] <- average(nights$sleep_period_hours, 2)
+
+  out[["cac_gen_protodays"]] <- format_number(
+    as_number(person$meas_dur_def_proto_day), 3
+  )
+  out[["cac_gen_weardays"]] <- format_number(
+    as_number(person$wear_dur_def_proto_day), 3
+  )
+  out[["cac_gen_validwe"]] <- as.character(sum(valid$weekend))
+  out[["cac_gen_validwd"]] <- as.character(sum(!valid$weekend))
+  out[["cac_gen_calibstatus"]] <- person$calib_status
+  out[["cac_gen_caliberror"]] <- format_number(as_number(person$calib_err), 4)
+  out[["cac_gen_nights"]] <- results$part4_person$n_nights_acc
+  out[["cac_gen_sleepdef"]] <- results$part4_night$sleepparam[1]
+  out
+}
+
+# Numbers as plain decimals rounded to `digits` places (never scientific
+# notation, which REDCap rejects), or NA.
+format_number <- function(x, digits) {
+  out <- formatC(round(x, digits), format = "f", digits = digits)
+  out <- sub("[.]?0+$", "", out)
+  out[is.na(x)] <- NA_character_
+  out
+}

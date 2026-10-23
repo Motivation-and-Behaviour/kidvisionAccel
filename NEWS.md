@@ -33,6 +33,13 @@ covers the foundation stage.
   each other, or more than 3 days after the previous one stopped, need
   review (step 2).
 * `kv_audit_folders()` lists OneDrive folders to rename or fix.
+* `kv_process()` runs GGIR on each recording in its own R process, with a
+  timeout and a log, and judges success from GGIR's output (step 3). When the
+  REDCap visit dates are plausible, GGIR uses only the data from visit 1 to
+  visit 2.
+* `kv_collate()` writes one CSV per GGIR part (2, 4, 5 and 6) for REDCap,
+  builds a table of measurement days, and prepares the values for REDCap's
+  accelerometer instruments (step 4).
 
 ## Processing changes
 

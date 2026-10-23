@@ -6,9 +6,9 @@ raw GENEActiv files from OneDrive, runs a pinned version of
 [GGIR](https://github.com/wadpac/GGIR), writes the results back to REDCap, and
 creates a report for each family.
 
-> **Status:** under active development. Setup checks and finding and copying
-> raw files are available; processing, REDCap import and reports are being
-> added in stages.
+> **Status:** under active development. Everything up to running GGIR and
+> preparing the REDCap values is available; writing to REDCap and the
+> participant reports are being added in stages.
 
 ## Setup
 
@@ -59,7 +59,14 @@ kv_check()
 jobs <- kv_pending()      # recordings that need processing, from REDCap
 jobs <- kv_locate(jobs)   # find their files on OneDrive (nothing downloaded)
 jobs <- kv_fetch(jobs)    # copy and check the files
+jobs <- kv_process(jobs)  # run GGIR
+jobs <- kv_collate(jobs)  # merge GGIR's results and prepare REDCap values
 ```
+
+GGIR takes about 3 minutes per recording. Its messages are saved in
+`logs/` in the work folder, and each recording's files are in
+`jobs/<record_id>_<timepoint>/`: the copied raw files in `raw/`, GGIR's
+output in `ggir/`, and the files for REDCap in `out/`.
 
 Each step returns the job table, with one row per recording. `status` shows
 how far each recording got, and `message` says why it stopped.

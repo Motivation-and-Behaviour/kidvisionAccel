@@ -67,7 +67,7 @@ kv_locate <- function(jobs, config = kv_config()) {
     ))
   }
 
-  report_jobs(jobs, "Locate")
+  report_jobs(jobs, "Locate", rows)
 }
 
 check_source_mounted <- function(source_dir) {

@@ -55,7 +55,7 @@ kv_fetch <- function(jobs, config = kv_config(), retries = 5,
   if (!"job_dir" %in% names(jobs)) jobs$job_dir <- NA_character_
   rows <- which(jobs$status == "located")
   if (length(rows) == 0) {
-    return(report_jobs(jobs, "Fetch"))
+    return(report_jobs(jobs, "Fetch", rows))
   }
 
   for (i in rows) {
@@ -90,7 +90,7 @@ kv_fetch <- function(jobs, config = kv_config(), retries = 5,
     jobs <- check_copies(jobs, i, config$tz, window_days)
   }
 
-  report_jobs(jobs, "Fetch")
+  report_jobs(jobs, "Fetch", rows)
 }
 
 # Identifies each source file in its copy's name: the device serial and
