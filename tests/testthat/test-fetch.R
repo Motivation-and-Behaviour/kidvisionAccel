@@ -109,6 +109,11 @@ test_that("inspect_bin() rejects files GGIR can't use", {
   expect_match(
     inspect_bin(junk, tz, min_mb = 0)$problem, "isn't a GENEActiv .bin file"
   )
+
+  no_start <- write_geneactiv(file.path(dir, "no_start.bin"), start = "x")
+  info <- inspect_bin(no_start, tz, min_mb = 0)
+  expect_equal(info$check, "invalid_file")
+  expect_match(info$problem, "doesn't give its start time")
 })
 
 test_that("inspect_bin() flags devices set up in another timezone", {
@@ -202,6 +207,16 @@ test_that("copy_notes() records mismatched serials and overlaps", {
   expect_match(notes, "2 files from a device swap", all = FALSE)
   expect_match(notes, "overlap by 24 hours", all = FALSE)
   expect_length(copy_notes(files[1, ], device_num = "29501"), 0)
+})
+
+test_that("copy_notes() ignores a header without a serial", {
+  files <- tibble::tibble(
+    path = "a.bin", serial = "029501", header_serial = NA_character_,
+    header_start = as.POSIXct("2025-03-10 09:00", tz = tz),
+    header_end = as.POSIXct("2025-03-14 09:00", tz = tz)
+  )
+
+  expect_length(copy_notes(files, device_num = "12345"), 0)
 })
 
 # kv_fetch() on files written by write_geneactiv(), which are smaller than

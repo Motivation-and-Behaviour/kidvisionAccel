@@ -59,17 +59,27 @@ test_that("check_ggir_output() reports GGIR errors and timeouts", {
   expect_match(timed_out$message, "didn't finish in time")
 })
 
-test_that("check_ggir_output() reports missing results", {
+test_that("check_ggir_output() reports missing part 2 results", {
   ggir_dir <- local_ggir_output(
-    function(results) file.remove(file.path(results, "part6_summary.csv")),
-    stage = 5
+    function(results) file.remove(file.path(results, "part2_summary.csv")),
+    stage = 1
   )
   outcome <- check(ggir_dir)
 
   expect_equal(outcome$status, "ggir_failed")
   expect_match(
-    outcome$message, "stopped after part 5 without writing part6_summary.csv"
+    outcome$message, "stopped after part 1 without writing part2_summary.csv"
   )
+})
+
+test_that("check_ggir_output() accepts output without part 4, 5 or 6", {
+  # GGIR writes these only when a night or day is valid
+  ggir_dir <- local_ggir_output(function(results) {
+    parts <- c("part4_*", "part5_*", "part6_*")
+    file.remove(Sys.glob(file.path(results, parts)))
+  })
+
+  expect_equal(check(ggir_dir)$status, "processed")
 })
 
 test_that("check_ggir_output() reports files GGIR found corrupt", {
@@ -80,14 +90,6 @@ test_that("check_ggir_output() reports files GGIR found corrupt", {
 
   expect_equal(outcome$status, "invalid_file")
   expect_match(outcome$message, "flags 9999_baseline_test.csv as corrupt")
-})
-
-test_that("check_ggir_output() reports recordings with no valid day", {
-  ggir_dir <- local_ggir_output(function(results) {
-    edit_result(results, "part2_daysummary.csv", "N valid hours", "10")
-  })
-
-  expect_equal(check(ggir_dir)$status, "no_valid_days")
 })
 
 test_that("check_ggir_output() checks the ID and that files were appended", {

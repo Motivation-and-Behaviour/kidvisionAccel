@@ -28,15 +28,22 @@ write_report_charts <- function(data, dir) {
     activity = 3, day = 1.5, sleep = 2.7, timing = 2.8, efficiency = 2.6
   )
   for (name in names(charts)) {
-    ragg::agg_png(
-      file.path(dir, paste0(name, ".png")),
-      width = 6.3, height = heights[[name]], units = "in", res = 300,
-      background = "white"
+    save_chart(
+      charts[[name]], file.path(dir, paste0(name, ".png")), heights[[name]]
     )
-    print(charts[[name]])
-    grDevices::dev.off()
   }
   invisible(names(charts))
+}
+
+save_chart <- function(chart, path, height) {
+  ragg::agg_png(
+    path,
+    width = 6.3, height = height, units = "in", res = 300,
+    background = "white"
+  )
+  # Closed even if drawing fails, so failed reports don't leave devices open
+  on.exit(grDevices::dev.off())
+  print(chart)
 }
 
 register_report_font <- function() {

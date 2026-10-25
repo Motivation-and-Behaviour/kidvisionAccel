@@ -166,10 +166,13 @@ summary_values <- function(days, results) {
   out[["cac_gen_validwd"]] <- as.character(sum(!valid$weekend))
   out[["cac_gen_calibstatus"]] <- person$calib_status
   out[["cac_gen_caliberror"]] <- format_number(as_number(person$calib_err), 4)
-  out[["cac_gen_nights"]] <- results$part4_person$n_nights_acc
-  out[["cac_gen_sleepdef"]] <- results$part4_night$sleepparam[1]
+  # Part 4's results are empty when no night was valid
+  out[["cac_gen_nights"]] <- first_value(results$part4_person$n_nights_acc)
+  out[["cac_gen_sleepdef"]] <- first_value(results$part4_night$sleepparam)
   out
 }
+
+first_value <- function(x) if (length(x) == 0) NA_character_ else x[[1]]
 
 # Numbers as plain decimals rounded to `digits` places (never scientific
 # notation, which REDCap rejects), or NA.

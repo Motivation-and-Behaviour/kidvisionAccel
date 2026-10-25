@@ -21,7 +21,8 @@
 #   copy_failed   copying from OneDrive failed; it will be retried next run
 #   ggir_failed   GGIR stopped with an error or without writing its results
 #   ggir_timeout  GGIR ran out of time; it will be retried
-#   no_valid_days GGIR found no day with enough wear to use
+#   no_valid_days GGIR found no day or night with enough wear to use
+#   collate_failed GGIR's results couldn't be merged; it will be retried
 #   report_failed the report couldn't be created; it will be retried
 #   write_failed  writing to REDCap failed part-way; it will be retried
 
@@ -29,7 +30,7 @@ job_statuses <- c(
   "pending", "located", "ready", "processed", "collated", "reported",
   "written", "no_folder", "no_files", "misnamed", "needs_review",
   "invalid_file", "copy_failed", "ggir_failed", "ggir_timeout",
-  "no_valid_days", "report_failed", "write_failed"
+  "no_valid_days", "collate_failed", "report_failed", "write_failed"
 )
 
 add_note <- function(jobs, i, note, check = TRUE) {
@@ -64,7 +65,7 @@ report_jobs <- function(jobs, step, rows = seq_len(nrow(jobs))) {
 
   actionable <- c(
     "misnamed", "needs_review", "invalid_file", "copy_failed", "ggir_failed",
-    "ggir_timeout", "report_failed", "write_failed"
+    "ggir_timeout", "collate_failed", "report_failed", "write_failed"
   )
   problems <- jobs[intersect(rows, which(jobs$status %in% actionable)), ]
   if (nrow(problems) > 0) {

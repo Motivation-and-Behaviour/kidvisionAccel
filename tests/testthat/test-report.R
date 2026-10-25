@@ -184,6 +184,30 @@ test_that("kv_report() marks reports that can't be created", {
   expect_match(jobs$message, "couldn't be created: Typst failed")
 })
 
+test_that("kv_report() marks reports when REDCap can't be read", {
+  local_mocked_bindings(participant_details = function(config, ids) {
+    stop("REDCap timed out")
+  })
+
+  jobs <- suppressMessages(
+    kv_report(collated_job(withr::local_tempdir()), kv_config())
+  )
+
+  expect_equal(jobs$status, "report_failed")
+  expect_match(jobs$message, "couldn't be read from REDCap: REDCap timed out")
+})
+
+test_that("save_chart() closes its device if the chart fails", {
+  devices <- grDevices::dev.list()
+  chart <- ggplot2::ggplot(data.frame(x = 1), ggplot2::aes(.data$x, .data$y)) +
+    ggplot2::geom_point()
+
+  expect_error(
+    save_chart(chart, file.path(withr::local_tempdir(), "x.png"), 1)
+  )
+  expect_identical(grDevices::dev.list(), devices)
+})
+
 test_that("crowded charts get compact labels without rounding to :60", {
   table <- tibble::tibble(
     date = as.Date("2025-05-27") + 0:11,

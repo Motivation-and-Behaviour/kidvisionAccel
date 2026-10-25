@@ -24,7 +24,9 @@
 #' @return `ggir_params()` returns a named list of arguments for
 #'   [GGIR::GGIR()]. `ggir_params_hash()` returns a hash of that list, which is
 #'   stored with each processed recording so that recordings processed with
-#'   different settings can be found.
+#'   different settings can be found. It is the MD5 hash of the settings as
+#'   JSON, so it only changes when the settings do, not with the R or package
+#'   versions.
 #' @export
 #' @examples
 #' str(ggir_params())
@@ -81,7 +83,11 @@ ggir_params <- function(tz = "Australia/Sydney") {
 #' @rdname ggir_params
 #' @export
 ggir_params_hash <- function(tz = "Australia/Sydney") {
-  rlang::hash(ggir_params(tz))
+  # tools::md5sum() only hashes files before R 4.5
+  path <- tempfile(fileext = ".json")
+  on.exit(unlink(path))
+  writeLines(jsonlite::toJSON(ggir_params(tz), digits = NA), path)
+  unname(tools::md5sum(path))
 }
 
 # Names in `params` that the installed GGIR does not recognise. GGIR errors on

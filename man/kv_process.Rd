@@ -41,7 +41,10 @@ only the data from visit 1 to visit 2. This leaves out time before the
 device was handed over and after it was collected.
 
 GGIR doesn't always stop with an error when it can't process a file, so
-success is judged from its output: all the expected result files must
-exist, GGIR's quality report must not flag the file as corrupt, and the
+success is judged from its output: the part 2 result files must exist,
+GGIR's quality report must not flag the file as corrupt, and the
 participant ID in the results must be the record ID, with one recording.
+GGIR only writes the part 4, 5 and 6 results when it has something to
+report, such as a valid night, so a recording without them is still
+processed; \code{\link[=kv_collate]{kv_collate()}} decides whether it has enough to use.
 }

@@ -1,13 +1,13 @@
 test_that("redcap_status_code() maps each outcome to a REDCap status", {
   statuses <- c(
     "reported", "no_folder", "no_files", "no_valid_days", "copy_failed",
-    "report_failed", "ggir_timeout", "misnamed", "needs_review",
-    "ggir_failed", "invalid_file", "pending", "collated"
+    "report_failed", "ggir_timeout", "collate_failed", "misnamed",
+    "needs_review", "ggir_failed", "invalid_file", "pending", "collated"
   )
 
   expect_equal(
     redcap_status_code(statuses),
-    c(1L, 3L, 3L, 4L, 5L, 5L, 5L, 6L, 6L, 7L, 7L, NA, NA)
+    c(1L, 3L, 3L, 4L, 5L, 5L, 5L, 5L, 6L, 6L, 7L, 7L, NA, NA)
   )
 })
 
@@ -53,6 +53,9 @@ local_fake_redcap <- function(env = parent.frame()) {
     rc_import_records = function(rcon, data) record("records", data),
     rc_import_file = function(rcon, file, record, field, event) {
       record("file", list(file = basename(file), field = field, event = event))
+    },
+    rc_delete_file = function(rcon, record, field, event) {
+      record("delete", list(field = field, event = event))
     },
     .env = env
   )
@@ -156,6 +159,58 @@ test_that("kv_write() records why a recording couldn't be processed", {
   expect_equal(imports[[1]]$value$cac_proc_status, "3")
   expect_equal(imports[[1]]$value$cac_proc_notes, "No .bin files.")
   expect_equal(imports[[2]]$value$cac_proc_nfiles, "0")
+})
+
+test_that("kv_write() removes earlier results that no longer match", {
+  calls <- local_fake_redcap()
+  jobs <- fake_jobs(c("1001", "1002", "1003"))
+  jobs$status <- c("needs_review", "copy_failed", "no_folder")
+  jobs$has_results <- TRUE
+  jobs$uploaded_files <- list(c("acc_pt2", "reports_accel"), "acc_pt2", "x")
+
+  jobs <- suppressMessages(kv_write(jobs, config_for(withr::local_tempdir())))
+
+  expect_equal(jobs$redcap_status, c(6L, 5L, 3L))
+  types <- vapply(calls$log, `[[`, "", "type")
+  expect_equal(types, c(
+    # 1001: in progress, values blanked, files deleted, then the status
+    "validate", "records", "validate", "records", "delete", "delete",
+    "records",
+    # 1002 and 1003: kept, as they are processed again automatically
+    "validate", "records", "validate", "records"
+  ))
+  imports <- Filter(function(x) x$type == "records", calls$log)
+  expect_equal(imports[[1]]$value$cac_proc_status, "0")
+  cleared <- imports[[2]]$value
+  expect_true(is.na(cleared$cac_sum_mvpa))
+  expect_true(is.na(cleared$cac_day1_noc))
+  expect_equal(cleared$accelerometer_sleep_complete, "0")
+  expect_false(any(c("cac_gen_wrist", "cac_gen_num") %in% names(cleared)))
+  expect_equal(imports[[3]]$value$cac_proc_status, "6")
+  deleted <- Filter(function(x) x$type == "delete", calls$log)
+  expect_equal(
+    vapply(deleted, function(x) x$value$field, ""),
+    c("acc_pt2", "reports_accel")
+  )
+})
+
+test_that("kv_write() saves a dry run of removing earlier results", {
+  calls <- local_fake_redcap()
+  work_dir <- withr::local_tempdir()
+  jobs <- fake_jobs("1001")
+  jobs$status <- "invalid_file"
+  jobs$has_results <- TRUE
+  jobs$uploaded_files <- list(c("acc_pt2", "acc_pt4"))
+
+  suppressMessages(kv_write(jobs, config_for(work_dir), dry_run = TRUE))
+
+  dir <- file.path(work_dir, "dry_run", "1001_baseline")
+  expect_setequal(basename(fs::dir_ls(dir)), c(
+    "1_status.csv", "2_cleared.csv", "3_deleted_files.txt", "4_status.csv"
+  ))
+  expect_equal(
+    readLines(file.path(dir, "3_deleted_files.txt")), c("acc_pt2", "acc_pt4")
+  )
 })
 
 test_that("kv_write() saves a dry run instead of writing", {

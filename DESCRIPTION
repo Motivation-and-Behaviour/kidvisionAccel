@@ -34,7 +34,8 @@ Imports:
     redcapAPI,
     rlang (>= 1.1.0),
     systemfonts,
-    tibble
+    tibble,
+    tools
 Suggests:
     knitr,
     rmarkdown,

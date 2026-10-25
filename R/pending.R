@@ -50,7 +50,7 @@ kv_pending <- function(
     fields = pending_fields,
     events = redcap_events
   )
-  recordings <- recording_states(records)
+  recordings <- recording_states(records, ggir_params_hash(config$tz))
 
   # A recording with no file found is retried once a file appears. Only
   # folder listings are read, so nothing is downloaded.
@@ -74,8 +74,9 @@ kv_pending <- function(
 }
 
 # One row per participant and timepoint (visit 2 event), with what is known
-# about the recording from REDCap and its `state`.
-recording_states <- function(records) {
+# about the recording from REDCap and its `state`. `params_hash` is the hash
+# of the current GGIR settings.
+recording_states <- function(records, params_hash = ggir_params_hash()) {
   value <- function(x) blank_to_na(x, nrow(records))
   event <- value(records$redcap_event_name)
 
@@ -102,10 +103,11 @@ recording_states <- function(records) {
   )
   visit1 <- visit1[!is.na(visit1$timepoint), ]
 
-  files_present <- Reduce(
-    `&`,
-    lapply(file_fields, function(f) !is.na(value(records[[f]])))
-  )
+  uploaded <- lapply(file_fields, function(f) !is.na(value(records[[f]])))
+  files_present <- Reduce(`&`, uploaded)
+  uploaded_files <- lapply(seq_len(nrow(records)), function(r) {
+    unname(file_fields[vapply(uploaded, `[[`, logical(1), r)])
+  })
   visit2 <- tibble::tibble(
     record_id = value(records$record_id),
     timepoint = timepoint_map$timepoint[
@@ -116,6 +118,7 @@ recording_states <- function(records) {
     accel_downloaded = value(records$sop2_postchecklist___1) %in% "1",
     device_num = value(records$cac_gen_num),
     files_present = files_present,
+    uploaded_files = uploaded_files,
     proc_status = suppressWarnings(
       as.integer(value(records$cac_proc_status))
     ),
@@ -149,8 +152,11 @@ recording_states <- function(records) {
   )
   recordings$outdated <- recordings$state == "complete" & (
     !same_version(recordings$proc_ggir, pinned_versions[["GGIR"]]) |
-      !recordings$proc_params %in% ggir_params_hash()
+      !recordings$proc_params %in% params_hash
   )
+  # REDCap may hold values or files from earlier processing
+  recordings$has_results <- lengths(recordings$uploaded_files) > 0 |
+    recordings$proc_status %in% c(0, 1, 2)
 
   order <- order(
     as_number(recordings$record_id),
@@ -228,6 +234,8 @@ new_job_table <- function(recordings) {
     visit2_date = recordings$visit2_date,
     accel_downloaded = recordings$accel_downloaded,
     device_num = recordings$device_num,
+    has_results = recordings$has_results,
+    uploaded_files = recordings$uploaded_files,
     status = rep("pending", nrow(recordings)),
     message = rep(NA_character_, nrow(recordings)),
     notes = rep(list(character()), nrow(recordings)),

@@ -18,6 +18,14 @@ test_that("kv_config() reads settings from environment variables", {
   expect_identical(config$workers, 4L)
 })
 
+test_that("kv_config() tidies the folder paths", {
+  config <- kv_config(source_dir = "/onedrive/", work_dir = "~/work//kv")
+
+  expect_equal(config$source_dir, "/onedrive")
+  expect_equal(config$work_dir, file.path(fs::path_home(), "work", "kv"))
+  expect_equal(kv_config(source_dir = "")$source_dir, "")
+})
+
 test_that("kv_config() uses defaults for unset or empty variables", {
   withr::local_envvar(
     REDCAP_URI = "",

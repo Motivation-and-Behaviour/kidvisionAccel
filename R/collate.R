@@ -28,8 +28,9 @@
 #' @return The job table, with the CSV files to upload in `part_files`, the
 #'   day table in `days`, and the REDCap values in `redcap` (a one-row data
 #'   frame, also saved as `<record_id>_<timepoint>_redcap.csv` with the part
-#'   files). Recordings have status `"collated"`, or `"no_valid_days"` if
-#'   there was no valid day or night.
+#'   files). Recordings have status `"collated"`, `"no_valid_days"` if there
+#'   was no valid day or night, or `"collate_failed"` if the results couldn't
+#'   be merged.
 #' @export
 kv_collate <- function(jobs, config = kv_config()) {
   for (column in c("part_files", "days", "redcap")) {
@@ -41,7 +42,7 @@ kv_collate <- function(jobs, config = kv_config()) {
     jobs <- tryCatch(
       collate_job(jobs, i, config),
       error = function(e) {
-        set_status(jobs, i, "ggir_failed", paste(
+        set_status(jobs, i, "collate_failed", paste(
           "GGIR's results couldn't be merged:", conditionMessage(e)
         ))
       }
@@ -93,12 +94,17 @@ collate_job <- function(jobs, i, config) {
   set_status(jobs, i, "collated")
 }
 
+# GGIR's results, named as in `ggir_results_files`. Those GGIR didn't write,
+# as it had nothing to report, are empty data frames.
 read_ggir_results <- function(ggir_dir) {
   paths <- ggir_result_paths(ggir_dir)
-  if (anyNA(paths)) {
-    stop("missing ", paste(ggir_results_files[is.na(paths)], collapse = ", "))
+  missing <- intersect(required_results, names(paths)[is.na(paths)])
+  if (length(missing) > 0) {
+    stop("missing ", paste(ggir_results_files[missing], collapse = ", "))
   }
-  lapply(paths, read_ggir_csv)
+  lapply(paths, function(path) {
+    if (is.na(path)) data.frame() else read_ggir_csv(path)
+  })
 }
 
 # Writes the files uploaded to REDCap, one per GGIR part, and returns their
@@ -159,7 +165,7 @@ day_table <- function(results, first = NA, last = NA) {
 
   nights <- results$part4_night
   n <- match(date, as.Date(nights$calendar_date))
-  sleep <- function(column) nights[[column]][n]
+  sleep <- function(column) as.character(nights[[column]])[n]
   days$valid_night <- !is.na(n)
   days$sleep_hours <- as_number(sleep("SleepDurationInSpt"))
   days$sleep_period_hours <- as_number(sleep("SptDuration"))

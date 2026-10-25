@@ -199,9 +199,16 @@ recorded, so they aren't tried again on every run:
 | 2, Complete - check notes | As above, with something worth checking in the notes, such as a device swap, more than 10 days, or implausible visit dates |
 | 3, No file found | No folder or `.bin` file; processed again once a file appears |
 | 4, No valid days | No day or night had enough wear |
-| 5, Failed (will retry) | Copying, the report or writing failed, or GGIR ran out of time; processed again on the next run |
+| 5, Failed (will retry) | Copying, merging GGIR's results, the report or writing failed, or GGIR ran out of time; processed again on the next run |
 | 6, Needs manual review | A folder needs renaming, or the files need a decision |
 | 7, Failed (cannot be processed) | GGIR couldn't process the file, or it is corrupt or incomplete |
+
+If a recording that had been processed before can't be processed this time
+(for example, when it is reprocessed after a GGIR update), its earlier
+values are blanked, its files deleted and its instruments marked incomplete,
+so REDCap never holds results that don't match the status. The exceptions
+are *No file found* and *Failed (will retry)*, which are processed again
+automatically, so the earlier results are kept until then.
 
 ## How recordings are processed
 

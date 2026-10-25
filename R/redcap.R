@@ -74,6 +74,10 @@ rc_import_records <- function(rcon, data) {
   invisible(count)
 }
 
+rc_delete_file <- function(rcon, record, field, event) {
+  redcapAPI::deleteFiles(rcon, record = record, field = field, event = event)
+}
+
 rc_import_file <- function(rcon, file, record, field, event) {
   redcapAPI::importFiles(
     rcon,

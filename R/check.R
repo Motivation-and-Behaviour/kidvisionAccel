@@ -131,7 +131,7 @@ check_source_dir <- function(path) {
     return(check_result(check, "fail", glue::glue("{path} does not exist.")))
   }
   # Listing the folder does not make OneDrive download anything.
-  participants <- fs::dir_ls(path, type = "directory", regexp = "/[0-9]+[^/]*$")
+  participants <- participant_folders(path)
   if (length(participants) == 0) {
     return(check_result(check, "fail", glue::glue(
       "No participant folders in {path}. ",

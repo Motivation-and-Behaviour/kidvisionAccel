@@ -206,7 +206,8 @@ copy_notes <- function(files, device_num) {
   notes <- character()
   name <- basename(files$path)
 
-  mismatch <- !is.na(files$serial) & files$serial != files$header_serial
+  mismatch <- !is.na(files$serial) & !is.na(files$header_serial) &
+    files$serial != files$header_serial
   notes <- c(notes, glue::glue(
     "{name[mismatch]} is named with serial {files$serial[mismatch]}, but its ",
     "header says {files$header_serial[mismatch]}."
@@ -214,7 +215,7 @@ copy_notes <- function(files, device_num) {
 
   device <- suppressWarnings(as.integer(device_num))
   serials <- suppressWarnings(as.integer(files$header_serial))
-  if (!is.na(device) && !device %in% serials) {
+  if (!is.na(device) && !all(is.na(serials)) && !device %in% serials) {
     notes <- c(notes, glue::glue(
       "The GENEActiv number in REDCap ({device_num}) doesn't match the ",
       "device serial ({paste(files$header_serial, collapse = ', ')})."
@@ -405,6 +406,12 @@ inspect_bin <- function(path, tz = "Australia/Sydney", min_mb = 2) {
   )
   # Each page holds 300 samples
   out$header_end <- out$header_start + out$pages * 300 / out$sample_rate
+  if (is.na(out$header_end)) {
+    return(problem("invalid_file", glue::glue(
+      "{name}'s header doesn't give its start time, sample rate and number ",
+      "of pages."
+    )))
+  }
 
   last <- last_page_number(path)
   if (is.na(last) || last < out$pages - 1) {
@@ -414,11 +421,7 @@ inspect_bin <- function(path, tz = "Australia/Sydney", min_mb = 2) {
     )))
   }
 
-  year <- if (is.na(out$header_start)) {
-    format(Sys.Date(), "%Y")
-  } else {
-    format(out$header_start, "%Y")
-  }
+  year <- format(out$header_start, "%Y")
   if (!header$tzone %in% tz_offsets(tz, year)) {
     return(problem("needs_review", glue::glue(
       "{name} was set up in timezone GMT{sprintf('%+g', out$tz_offset)}, ",

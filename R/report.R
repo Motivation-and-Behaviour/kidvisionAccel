@@ -23,7 +23,19 @@ kv_report <- function(jobs, config = kv_config()) {
     return(report_jobs(jobs, "Report", rows))
   }
 
-  people <- participant_details(config, unique(jobs$record_id[rows]))
+  people <- tryCatch(
+    participant_details(config, unique(jobs$record_id[rows])),
+    error = function(e) e
+  )
+  if (inherits(people, "error")) {
+    message <- paste(
+      "The participant's details couldn't be read from REDCap:",
+      conditionMessage(people)
+    )
+    for (i in rows) jobs <- set_status(jobs, i, "report_failed", message)
+    return(report_jobs(jobs, "Report", rows))
+  }
+
   for (i in rows) {
     person <- people[people$record_id == jobs$record_id[[i]], ]
     path <- file.path(

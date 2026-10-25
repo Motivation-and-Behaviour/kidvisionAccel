@@ -75,8 +75,8 @@ kv_config <- function(
     list(
       redcap_uri = redcap_uri,
       redcap_key = redcap_key,
-      source_dir = source_dir,
-      work_dir = work_dir,
+      source_dir = tidy_path(source_dir),
+      work_dir = tidy_path(work_dir),
       tz = tz,
       workers = as.integer(workers),
       min_free_gb = min_free_gb
@@ -99,6 +99,10 @@ print.kv_config <- function(x, ...) {
   cat("<kv_config>\n", paste0("  ", names(rows), ": ", rows, "\n"), sep = "")
   invisible(x)
 }
+
+# Paths with "~" expanded and no doubled or trailing slashes, so the paths
+# built from them match those that fs lists.
+tidy_path <- function(path) as.character(fs::path_tidy(fs::path_expand(path)))
 
 # Like Sys.getenv(), but treats a variable set to "" as unset.
 env_or <- function(name, default) {

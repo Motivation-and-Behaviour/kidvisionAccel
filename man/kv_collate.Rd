@@ -15,8 +15,9 @@ kv_collate(jobs, config = kv_config())
 The job table, with the CSV files to upload in \code{part_files}, the
 day table in \code{days}, and the REDCap values in \code{redcap} (a one-row data
 frame, also saved as \verb{<record_id>_<timepoint>_redcap.csv} with the part
-files). Recordings have status \code{"collated"}, or \code{"no_valid_days"} if
-there was no valid day or night.
+files). Recordings have status \code{"collated"}, \code{"no_valid_days"} if there
+was no valid day or night, or \code{"collate_failed"} if the results couldn't
+be merged.
 }
 \description{
 Step 4 of the workflow, part 1. For each recording processed by

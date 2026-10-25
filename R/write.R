@@ -19,10 +19,14 @@
 #'
 #' For a recording that couldn't be processed, only its processing status,
 #' date and notes are recorded: "No file found" (no folder or file), "No
-#' valid days", "Failed (will retry)" (copying or the report failed, or GGIR
-#' ran out of time), "Needs manual review" (a misnamed folder, or files that
-#' need a decision), or "Failed (cannot be processed)" (GGIR couldn't process
-#' the file, or it is unreadable or incomplete).
+#' valid days", "Failed (will retry)" (copying, merging GGIR's results or the
+#' report failed, or GGIR ran out of time), "Needs manual review" (a misnamed
+#' folder, or files that need a decision), or "Failed (cannot be processed)"
+#' (GGIR couldn't process the file, or it is unreadable or incomplete). If
+#' REDCap has results from earlier processing, they no longer match the
+#' status, so the values are blanked, the files deleted and the instruments
+#' marked incomplete first. Results are kept for "No file found" and "Failed
+#' (will retry)", which are processed again automatically.
 #'
 #' Every set of values is first checked against the REDCap project. A value
 #' REDCap wouldn't accept stops that recording, rather than being imported as
@@ -32,7 +36,8 @@
 #' @param config A [kv_config()] object.
 #' @param dry_run If `TRUE`, nothing is sent to REDCap. The values and files
 #'   that would be are saved in `dry_run/<record_id>_<timepoint>/` in the
-#'   work folder instead, after being checked against the REDCap project.
+#'   work folder instead (replacing any earlier dry run), after being checked
+#'   against the REDCap project.
 #'
 #' @return The job table, with the processing status recorded in REDCap in
 #'   `redcap_status`. Recordings with a report have status `"written"`, or
@@ -77,8 +82,9 @@ kv_write <- function(jobs, config = kv_config(), dry_run = FALSE) {
 redcap_status_code <- function(status) {
   unname(c(
     reported = 1L, no_folder = 3L, no_files = 3L, no_valid_days = 4L,
-    copy_failed = 5L, ggir_timeout = 5L, report_failed = 5L, misnamed = 6L,
-    needs_review = 6L, ggir_failed = 7L, invalid_file = 7L
+    copy_failed = 5L, ggir_timeout = 5L, collate_failed = 5L,
+    report_failed = 5L, misnamed = 6L, needs_review = 6L, ggir_failed = 7L,
+    invalid_file = 7L
   )[status])
 }
 
@@ -112,9 +118,35 @@ write_status_only <- function(jobs, i, writer, config) {
   code <- redcap_status_code(jobs$status[[i]])
   record <- status_record(jobs, i, code, config)
   writer$validate(record)
-  writer$records(record, "status")
+  # Recordings processed again automatically keep their results until then
+  if (!isTRUE(jobs$has_results[[i]]) || code %in% c(3L, 5L)) {
+    writer$records(record, "status")
+  } else {
+    # As for write_results(): "In progress" until the old results are gone
+    writer$records(status_record(jobs, i, 0L, config, brief = TRUE), "1_status")
+    clear_results(jobs, i, writer)
+    writer$records(record, "4_status")
+  }
   jobs$redcap_status[[i]] <- code
   jobs
+}
+
+# Removes the results of earlier processing from REDCap: blanks the derived
+# values, marks their instruments incomplete and deletes the uploaded files.
+clear_results <- function(jobs, i, writer) {
+  fields <- redcap_fields()
+  derived <- fields$field[fields$role == "derived"]
+  blank <- tibble::as_tibble(c(
+    list(record_id = jobs$record_id[[i]], redcap_event_name = jobs$event[[i]]),
+    stats::setNames(as.list(rep(NA_character_, length(derived))), derived),
+    stats::setNames(
+      as.list(rep("0", length(completed_forms))),
+      paste0(completed_forms, "_complete")
+    )
+  ))
+  writer$validate(blank)
+  writer$records(blank, "2_cleared")
+  for (field in jobs$uploaded_files[[i]]) writer$delete_file(field)
 }
 
 # The processing-status fields for job `i`. `brief` gives only the status
@@ -171,11 +203,15 @@ redcap_writer <- function(rcon, config, dry_run, record, event, name) {
           rcon, path,
           record = record, field = field, event = event
         )
+      },
+      delete_file = function(field) {
+        rc_delete_file(rcon, record = record, field = field, event = event)
       }
     ))
   }
 
   dir <- file.path(config$work_dir, "dry_run", name)
+  if (fs::dir_exists(dir)) fs::dir_delete(dir)
   fs::dir_create(dir)
   list(
     validate = validate,
@@ -189,6 +225,11 @@ redcap_writer <- function(rcon, config, dry_run, record, event, name) {
       fs::file_copy(
         path, file.path(dir, paste0(field, "_", basename(path))),
         overwrite = TRUE
+      )
+    },
+    delete_file = function(field) {
+      cat(field, file = file.path(dir, "3_deleted_files.txt"), sep = "\n",
+        append = TRUE
       )
     }
   )

@@ -15,9 +15,12 @@
 #' device was handed over and after it was collected.
 #'
 #' GGIR doesn't always stop with an error when it can't process a file, so
-#' success is judged from its output: all the expected result files must
-#' exist, GGIR's quality report must not flag the file as corrupt, and the
+#' success is judged from its output: the part 2 result files must exist,
+#' GGIR's quality report must not flag the file as corrupt, and the
 #' participant ID in the results must be the record ID, with one recording.
+#' GGIR only writes the part 4, 5 and 6 results when it has something to
+#' report, such as a valid night, so a recording without them is still
+#' processed; [kv_collate()] decides whether it has enough to use.
 #'
 #' @param jobs A job table from [kv_fetch()].
 #' @param config A [kv_config()] object.
@@ -202,16 +205,7 @@ check_ggir_output <- function(ggir_dir, record_id, n_files, error, log) {
   }
 
   paths <- ggir_result_paths(ggir_dir)
-  if (!is.na(paths[["part2_day"]])) {
-    days <- read_ggir_csv(paths[["part2_day"]])
-    min_hours <- ggir_params()$includedaycrit[[1]]
-    if (!any(as_number(days$`N valid hours`) >= min_hours, na.rm = TRUE)) {
-      return(outcome("no_valid_days", glue::glue(
-        "No day had the {min_hours} hours of wear needed."
-      )))
-    }
-  }
-  missing <- names(paths)[is.na(paths)]
+  missing <- intersect(required_results, names(paths)[is.na(paths)])
   if (length(missing) > 0) {
     return(outcome("ggir_failed", paste0(
       "GGIR stopped ", ggir_stage(ggir_dir), " without writing ",
@@ -219,6 +213,7 @@ check_ggir_output <- function(ggir_dir, record_id, n_files, error, log) {
     )))
   }
 
+  days <- read_ggir_csv(paths[["part2_day"]])
   ids <- unique(days$ID)
   if (!identical(ids, record_id)) {
     return(outcome("needs_review", glue::glue(
@@ -248,6 +243,11 @@ ggir_results_files <- c(
   part5_ww = "part5_daysummary_WW_*.csv",
   part6 = "part6_summary.csv"
 )
+
+# GGIR always writes part 2's results. The others are only written when they
+# have something in them: part 4's when a night is valid, part 5's when a day
+# in that window is valid, and part 6's when there is enough data.
+required_results <- c("part2_day", "part2_person")
 
 # Paths to GGIR's result files, named as in `ggir_results_files`, with NA for
 # any that don't exist.

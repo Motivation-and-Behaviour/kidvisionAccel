@@ -117,7 +117,8 @@ test_that("check_source_dir() catches a missing or empty mount", {
   expect_match(check_source_dir(file.path(root, "nope"))$message, "not exist")
   expect_match(check_source_dir(root)$message, "No participant folders")
 
-  fs::dir_create(file.path(root, c("1353", "1148(1146)", "Practice Data")))
+  # Counted as kv_locate() does, so only folders named as a record ID
+  fs::dir_create(file.path(root, c("1353", "1009", "1148(1146)", "Practice")))
   result <- check_source_dir(root)
   expect_equal(result$status, "pass")
   expect_match(result$message, "^2 participant folders")

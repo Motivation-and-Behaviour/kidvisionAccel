@@ -13,7 +13,8 @@ kv_write(jobs, config = kv_config(), dry_run = FALSE)
 
 \item{dry_run}{If \code{TRUE}, nothing is sent to REDCap. The values and files
 that would be are saved in \verb{dry_run/<record_id>_<timepoint>/} in the
-work folder instead, after being checked against the REDCap project.}
+work folder instead (replacing any earlier dry run), after being checked
+against the REDCap project.}
 }
 \value{
 The job table, with the processing status recorded in REDCap in
@@ -43,10 +44,14 @@ recording is processed again on the next run.
 
 For a recording that couldn't be processed, only its processing status,
 date and notes are recorded: "No file found" (no folder or file), "No
-valid days", "Failed (will retry)" (copying or the report failed, or GGIR
-ran out of time), "Needs manual review" (a misnamed folder, or files that
-need a decision), or "Failed (cannot be processed)" (GGIR couldn't process
-the file, or it is unreadable or incomplete).
+valid days", "Failed (will retry)" (copying, merging GGIR's results or the
+report failed, or GGIR ran out of time), "Needs manual review" (a misnamed
+folder, or files that need a decision), or "Failed (cannot be processed)"
+(GGIR couldn't process the file, or it is unreadable or incomplete). If
+REDCap has results from earlier processing, they no longer match the
+status, so the values are blanked, the files deleted and the instruments
+marked incomplete first. Results are kept for "No file found" and "Failed
+(will retry)", which are processed again automatically.
 
 Every set of values is first checked against the REDCap project. A value
 REDCap wouldn't accept stops that recording, rather than being imported as

@@ -1,0 +1,29 @@
+{
+  "features": {
+    "ghcr.io/rocker-org/devcontainer-features/pandoc:1": {
+      "version": "1.0.0",
+      "resolved": "ghcr.io/rocker-org/devcontainer-features/pandoc@sha256:f748017491dfbc2962c32a5d34614ca25bef94cc76ecfb295f3566910926dead",
+      "integrity": "sha256:f748017491dfbc2962c32a5d34614ca25bef94cc76ecfb295f3566910926dead"
+    },
+    "ghcr.io/rocker-org/devcontainer-features/quarto-cli:1": {
+      "version": "1.1.5",
+      "resolved": "ghcr.io/rocker-org/devcontainer-features/quarto-cli@sha256:7d1ba1c977b72d616e76089f016c87c1a581a05386aee635bae08e5a1375507d",
+      "integrity": "sha256:7d1ba1c977b72d616e76089f016c87c1a581a05386aee635bae08e5a1375507d"
+    },
+    "ghcr.io/rocker-org/devcontainer-features/r-apt:0": {
+      "version": "0.5.0",
+      "resolved": "ghcr.io/rocker-org/devcontainer-features/r-apt@sha256:77b2f97468c79afa09afd7141fac0bda0f395e265f606e13365e6767949dcc55",
+      "integrity": "sha256:77b2f97468c79afa09afd7141fac0bda0f395e265f606e13365e6767949dcc55"
+    },
+    "ghcr.io/rocker-org/devcontainer-features/r-packages:1": {
+      "version": "1.1.0",
+      "resolved": "ghcr.io/rocker-org/devcontainer-features/r-packages@sha256:1a4ec64c4d2060e78e9c812bd3b3622c7e008465d566a2781c0e2b17a82592e5",
+      "integrity": "sha256:1a4ec64c4d2060e78e9c812bd3b3622c7e008465d566a2781c0e2b17a82592e5"
+    },
+    "ghcr.io/rocker-org/devcontainer-features/renv-cache:latest": {
+      "version": "0.1.2",
+      "resolved": "ghcr.io/rocker-org/devcontainer-features/renv-cache@sha256:705bba0c78d4caf33a57c9a88bbe8e6e10ca944886c5209f2cf84757a6b8cf73",
+      "integrity": "sha256:705bba0c78d4caf33a57c9a88bbe8e6e10ca944886c5209f2cf84757a6b8cf73"
+    }
+  }
+}

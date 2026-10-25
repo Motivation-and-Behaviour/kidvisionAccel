@@ -64,6 +64,12 @@ test_that("recording_states() works out each recording's state", {
   expect_equal(states$visit1_date[1], as.Date("2025-03-10"))
   expect_equal(states$visit2_date[1], as.Date("2025-03-18"))
   expect_true(states$accel_downloaded[1])
+  expect_equal(
+    states$has_results,
+    c(FALSE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE)
+  )
+  expect_equal(states$uploaded_files[[1]], character())
+  expect_equal(states$uploaded_files[[3]], unname(file_fields))
 })
 
 test_that("recording_states() excludes recordings that must not be used", {
@@ -99,6 +105,17 @@ test_that("completed recordings are outdated after a GGIR or settings change", {
   )
 
   expect_equal(recording_states(records)$outdated, c(FALSE, TRUE, TRUE, TRUE))
+})
+
+test_that("the outdated check uses the configured timezone's settings", {
+  perth <- ggir_params_hash("Australia/Perth")
+  records <- fake_records(visit2(
+    "1", cac_proc_status = "1", cac_proc_ggir = pinned_versions[["GGIR"]],
+    cac_proc_params = perth
+  ))
+
+  expect_false(recording_states(records, perth)$outdated)
+  expect_true(recording_states(records)$outdated)
 })
 
 test_that("versions match however they're written", {
@@ -170,8 +187,8 @@ test_that("kv_pending() returns a job table of recordings to process", {
   expect_equal(jobs$event, rep("baseline_visit_2_arm_1", 2))
   expect_named(jobs, c(
     "record_id", "timepoint", "event", "reason", "visit1_date",
-    "visit2_date", "accel_downloaded", "device_num", "status", "message",
-    "notes", "check_notes"
+    "visit2_date", "accel_downloaded", "device_num", "has_results",
+    "uploaded_files", "status", "message", "notes", "check_notes"
   ))
 })
 

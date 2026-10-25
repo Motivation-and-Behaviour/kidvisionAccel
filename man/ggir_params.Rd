@@ -16,7 +16,9 @@ ggir_params_hash(tz = "Australia/Sydney")
 \code{ggir_params()} returns a named list of arguments for
 \code{\link[GGIR:GGIR]{GGIR::GGIR()}}. \code{ggir_params_hash()} returns a hash of that list, which is
 stored with each processed recording so that recordings processed with
-different settings can be found.
+different settings can be found. It is the MD5 hash of the settings as
+JSON, so it only changes when the settings do, not with the R or package
+versions.
 }
 \description{
 The single source of truth for how accelerometer files are processed. The

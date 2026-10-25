@@ -6,12 +6,20 @@ test_that("read_ggir_results() reads every result file", {
   expect_equal(nrow(results$part5_mm), 3)
 })
 
-test_that("read_ggir_results() reports missing files", {
+test_that("read_ggir_results() reports missing part 2 files", {
   ggir_dir <- local_ggir_output(function(results) {
+    file.remove(file.path(results, "part2_summary.csv"))
+  })
+
+  expect_error(read_ggir_results(ggir_dir), "missing part2_summary.csv")
+})
+
+test_that("read_ggir_results() gives empty results for files GGIR skipped", {
+  results <- fixture_results(function(results) {
     file.remove(file.path(results, "part6_summary.csv"))
   })
 
-  expect_error(read_ggir_results(ggir_dir), "missing part6_summary.csv")
+  expect_equal(nrow(results$part6), 0)
 })
 
 test_that("day_table() builds one row per day from parts 2, 4 and 5", {
@@ -173,9 +181,10 @@ test_that("kv_collate() flags recordings with no valid day or night", {
   expect_equal(jobs$status, "no_valid_days")
 })
 
-test_that("kv_collate() marks recordings whose results can't be read", {
+test_that("kv_collate() uses days without nights when part 4 is missing", {
+  # GGIR writes no part 4 results when no night is valid
   ggir_dir <- local_ggir_output(function(results) {
-    file.remove(file.path(results, "part6_summary.csv"))
+    file.remove(Sys.glob(file.path(results, "part4_*")))
   })
   work_dir <- withr::local_tempdir()
 
@@ -183,6 +192,36 @@ test_that("kv_collate() marks recordings whose results can't be read", {
     processed_job(ggir_dir, work_dir), kv_config(work_dir = work_dir)
   ))
 
-  expect_equal(jobs$status, "ggir_failed")
-  expect_match(jobs$message, "couldn't be merged: missing part6_summary.csv")
+  expect_equal(jobs$status, "collated")
+  expect_false(any(jobs$days[[1]]$valid_night))
+  expect_true(any(jobs$days[[1]]$valid_day))
+  expect_true(is.na(jobs$redcap[[1]]$cac_gen_nights))
+  expect_true(all(file.exists(jobs$part_files[[1]])))
+})
+
+test_that("kv_collate() flags recordings when parts 4 and 5 are missing", {
+  ggir_dir <- local_ggir_output(function(results) {
+    file.remove(Sys.glob(file.path(results, c("part4_*", "part5_*"))))
+  })
+  work_dir <- withr::local_tempdir()
+
+  jobs <- suppressMessages(kv_collate(
+    processed_job(ggir_dir, work_dir), kv_config(work_dir = work_dir)
+  ))
+
+  expect_equal(jobs$status, "no_valid_days")
+})
+
+test_that("kv_collate() marks recordings whose results can't be read", {
+  ggir_dir <- local_ggir_output(function(results) {
+    file.remove(file.path(results, "part2_summary.csv"))
+  })
+  work_dir <- withr::local_tempdir()
+
+  jobs <- suppressMessages(kv_collate(
+    processed_job(ggir_dir, work_dir), kv_config(work_dir = work_dir)
+  ))
+
+  expect_equal(jobs$status, "collate_failed")
+  expect_match(jobs$message, "couldn't be merged: missing part2_summary.csv")
 })
