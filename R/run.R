@@ -46,6 +46,7 @@ kv_run <- function(
   cleanup = TRUE
 ) {
   reprocess <- rlang::arg_match(reprocess)
+  workers <- as_workers(workers)
   started <- Sys.time()
   kv_check(config, dry_run = dry_run)
   if (dry_run) {

@@ -82,14 +82,9 @@ kv_locate <- function(jobs, config = kv_config()) {
 }
 
 check_source_mounted <- function(source_dir) {
-  mounted <- nzchar(source_dir) && fs::dir_exists(source_dir) &&
-    length(participant_folders(source_dir)) > 0
-  if (!mounted) {
-    cli::cli_abort(c(
-      "No participant folders found in {.path {source_dir}}.",
-      "i" = "Is OneDrive running, and is the folder mounted? \\
-      Run {.fn kv_check} for details."
-    ))
+  result <- check_source_dir(source_dir)
+  if (result$status == "fail") {
+    cli::cli_abort(paste("Source folder:", cli_escape(result$message)))
   }
 }
 
@@ -263,10 +258,14 @@ check_files <- function(files, record_id) {
   other <- !is.na(files$subject) & nzchar(files$subject) &
     subject_id != record_id
   if (any(other)) {
-    return(outcome("needs_review", glue::glue(
+    labelled <- glue::glue(
       "{basename(files$path[other])} is labelled as participant ",
-      "\"{files$subject[other]}\". Move it to the right participant, or to ",
-      "an \"{excluded_folder}\" subfolder."
+      "\"{files$subject[other]}\""
+    )
+    return(outcome("needs_review", glue::glue(
+      "{paste(labelled, collapse = '; ')}. Move ",
+      "{if (sum(other) == 1) 'it' else 'them'} to the right participant, or ",
+      "to an \"{excluded_folder}\" subfolder."
     )))
   }
 

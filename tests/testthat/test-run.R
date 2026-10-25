@@ -86,6 +86,15 @@ test_that("kv_run() stops early when nothing needs processing", {
   expect_equal(nrow(jobs), 0)
 })
 
+test_that("kv_run() rejects an invalid worker count before starting", {
+  local_mocked_bindings(kv_check = function(...) stop("shouldn't be called"))
+
+  expect_error(
+    kv_run(kv_config(work_dir = withr::local_tempdir()), workers = 0),
+    "positive whole number"
+  )
+})
+
 test_that("kv_cleanup() deletes each recording's local folder", {
   work_dir <- withr::local_tempdir()
   folders <- file.path(work_dir, "jobs", c("1001_baseline", "1002_baseline"))

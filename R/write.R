@@ -26,7 +26,8 @@
 #' REDCap has results from earlier processing, they no longer match the
 #' status, so the values are blanked, the files deleted and the instruments
 #' marked incomplete first. Results are kept for "No file found" and "Failed
-#' (will retry)", which are processed again automatically.
+#' (will retry)", which are processed again automatically, along with the
+#' GGIR version, settings and number of files that produced them.
 #'
 #' Every set of values is first checked against the REDCap project. A value
 #' REDCap wouldn't accept stops that recording, rather than being imported as
@@ -40,8 +41,9 @@
 #'   against the REDCap project.
 #'
 #' @return The job table, with the processing status recorded in REDCap in
-#'   `redcap_status`. Recordings with a report have status `"written"`, or
-#'   `"write_failed"` if writing failed.
+#'   `redcap_status`. Recordings with a report have status `"written"`.
+#'   Recordings that couldn't be written have status `"write_failed"`; for one
+#'   that couldn't be processed, a note keeps why.
 #' @export
 kv_write <- function(jobs, config = kv_config(), dry_run = FALSE) {
   if (!"redcap_status" %in% names(jobs)) jobs$redcap_status <- NA_integer_
@@ -64,12 +66,19 @@ kv_write <- function(jobs, config = kv_config(), dry_run = FALSE) {
         write_status_only(jobs, i, writer, config)
       },
       error = function(e) {
-        message <- paste("Writing to REDCap failed:", conditionMessage(e))
-        if (jobs$status[[i]] == "reported") {
-          set_status(jobs, i, "write_failed", message)
-        } else {
-          add_note(jobs, i, message)
+        if (jobs$status[[i]] != "reported") {
+          # Keep why the recording couldn't be processed
+          reason <- paste0(
+            "Not processed (", gsub("_", " ", jobs$status[[i]]), ")"
+          )
+          if (!is.na(jobs$message[[i]])) {
+            reason <- paste0(reason, ": ", jobs$message[[i]])
+          }
+          jobs <- add_note(jobs, i, reason)
         }
+        set_status(jobs, i, "write_failed", paste(
+          "Writing to REDCap failed:", conditionMessage(e)
+        ))
       }
     )
   }
@@ -116,27 +125,33 @@ write_results <- function(jobs, i, writer, config) {
 
 write_status_only <- function(jobs, i, writer, config) {
   code <- redcap_status_code(jobs$status[[i]])
-  record <- status_record(jobs, i, code, config)
+  has_results <- isTRUE(jobs$has_results[[i]])
+  # Recordings processed again automatically keep their results until then,
+  # with the versions and settings that produced them
+  keep <- has_results && code %in% c(3L, 5L)
+  record <- status_record(jobs, i, code, config, provenance = !keep)
   writer$validate(record)
-  # Recordings processed again automatically keep their results until then
-  if (!isTRUE(jobs$has_results[[i]]) || code %in% c(3L, 5L)) {
+  if (!has_results || keep) {
     writer$records(record, "status")
   } else {
+    blank <- blank_results(jobs, i)
+    writer$validate(blank)
     # As for write_results(): "In progress" until the old results are gone
     writer$records(status_record(jobs, i, 0L, config, brief = TRUE), "1_status")
-    clear_results(jobs, i, writer)
+    writer$records(blank, "2_cleared")
+    for (field in jobs$uploaded_files[[i]]) writer$delete_file(field)
     writer$records(record, "4_status")
   }
   jobs$redcap_status[[i]] <- code
   jobs
 }
 
-# Removes the results of earlier processing from REDCap: blanks the derived
-# values, marks their instruments incomplete and deletes the uploaded files.
-clear_results <- function(jobs, i, writer) {
+# The values that remove the results of earlier processing from REDCap: the
+# derived values blanked and their instruments marked incomplete.
+blank_results <- function(jobs, i) {
   fields <- redcap_fields()
   derived <- fields$field[fields$role == "derived"]
-  blank <- tibble::as_tibble(c(
+  tibble::as_tibble(c(
     list(record_id = jobs$record_id[[i]], redcap_event_name = jobs$event[[i]]),
     stats::setNames(as.list(rep(NA_character_, length(derived))), derived),
     stats::setNames(
@@ -144,14 +159,14 @@ clear_results <- function(jobs, i, writer) {
       paste0(completed_forms, "_complete")
     )
   ))
-  writer$validate(blank)
-  writer$records(blank, "2_cleared")
-  for (field in jobs$uploaded_files[[i]]) writer$delete_file(field)
 }
 
 # The processing-status fields for job `i`. `brief` gives only the status
-# and date, for marking a recording as in progress.
-status_record <- function(jobs, i, code, config, brief = FALSE) {
+# and date, for marking a recording as in progress. `provenance = FALSE`
+# leaves out the versions, settings and number of files, for when the results
+# in REDCap are kept.
+status_record <- function(jobs, i, code, config, brief = FALSE,
+                          provenance = TRUE) {
   record <- tibble::tibble(
     record_id = jobs$record_id[[i]],
     redcap_event_name = jobs$event[[i]],
@@ -161,11 +176,15 @@ status_record <- function(jobs, i, code, config, brief = FALSE) {
   if (brief) {
     return(record)
   }
-  files <- job_files(jobs, i)
-  record$cac_proc_ggir <- installed_version("GGIR")
-  record$cac_proc_pkg <- installed_version("kidvisionAccel")
-  record$cac_proc_params <- ggir_params_hash(config$tz)
-  record$cac_proc_nfiles <- as.character(if (is.null(files)) 0 else nrow(files))
+  if (provenance) {
+    files <- job_files(jobs, i)
+    record$cac_proc_ggir <- installed_version("GGIR")
+    record$cac_proc_pkg <- installed_version("kidvisionAccel")
+    record$cac_proc_params <- ggir_params_hash(config$tz)
+    record$cac_proc_nfiles <- as.character(
+      if (is.null(files)) 0 else nrow(files)
+    )
+  }
   record$cac_proc_notes <- processing_notes(jobs, i, config)
   record
 }

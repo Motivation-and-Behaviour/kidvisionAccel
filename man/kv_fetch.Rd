@@ -4,13 +4,7 @@
 \alias{kv_fetch}
 \title{Copy raw files from OneDrive and check them}
 \usage{
-kv_fetch(
-  jobs,
-  config = kv_config(),
-  retries = 5,
-  retry_wait = 60,
-  window_days = 3
-)
+kv_fetch(jobs, config = kv_config(), retries = 5, retry_wait = 60)
 }
 \arguments{
 \item{jobs}{A job table from \code{\link[=kv_locate]{kv_locate()}}.}
@@ -20,9 +14,6 @@ kv_fetch(
 \item{retries}{How many times to retry files that fail to copy.}
 
 \item{retry_wait}{Seconds to wait before each retry.}
-
-\item{window_days}{How many days before visit 1 a recording may start.
-Devices are set up shortly before they are handed over.}
 }
 \value{
 The job table, with each recording's folder in the work folder in
@@ -57,8 +48,8 @@ were only partly downloaded from the device or uploaded to OneDrive;
 computer in another timezone would have all its times shifted.
 }
 
-The recording must start no more than \code{window_days} before visit 1, and
-before visit 2, or it may be in the wrong timepoint folder.
+The recording must start no more than 3 days before visit 1, and before
+visit 2, or it may be in the wrong timepoint folder.
 
 When a recording has several files, they are a device swap, and are
 appended by GGIR, if each device started 24 hours or more after the one

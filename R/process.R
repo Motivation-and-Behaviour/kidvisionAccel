@@ -37,6 +37,7 @@
 #' @export
 kv_process <- function(jobs, config = kv_config(), timeout = 60,
                        workers = config$workers) {
+  workers <- as_workers(workers)
   if (!"ggir_dir" %in% names(jobs)) jobs$ggir_dir <- NA_character_
   if (!"study_first" %in% names(jobs)) jobs$study_first <- as.Date(NA)
   if (!"study_last" %in% names(jobs)) jobs$study_last <- as.Date(NA)
@@ -282,7 +283,7 @@ read_ggir_csv <- function(path) {
 
 # The period GGIR should use: visit 1 to visit 2, if those dates are
 # plausible. Otherwise `reason` says why the whole recording is used.
-study_dates <- function(visit1, visit2, start, window_days = 3) {
+study_dates <- function(visit1, visit2, start) {
   skip <- function(reason) list(first = NA, last = NA, reason = reason)
   if (is.na(visit1) || is.na(visit2)) {
     return(skip("a visit date is missing"))
@@ -292,7 +293,7 @@ study_dates <- function(visit1, visit2, start, window_days = 3) {
     return(skip(glue::glue("visit 2 was {days} days after visit 1")))
   }
   start <- local_date(start)
-  if (is.na(start) || start < visit1 - window_days || start > visit1) {
+  if (is.na(start) || start < visit1 - max_early_start_days || start > visit1) {
     return(skip(glue::glue(
       "the recording started on {start}, but visit 1 was {visit1}"
     )))

@@ -65,12 +65,6 @@ kv_config <- function(
   workers = env_or("KIDVISION_WORKERS", "1"),
   min_free_gb = 20
 ) {
-  workers <- as_number(workers)
-  valid_workers <- length(workers) == 1 && !is.na(workers) &&
-    workers >= 1 && workers %% 1 == 0
-  if (!valid_workers) {
-    cli::cli_abort("{.arg workers} must be a single positive whole number.")
-  }
   structure(
     list(
       redcap_uri = redcap_uri,
@@ -78,7 +72,7 @@ kv_config <- function(
       source_dir = tidy_path(source_dir),
       work_dir = tidy_path(work_dir),
       tz = tz,
-      workers = as.integer(workers),
+      workers = as_workers(workers),
       min_free_gb = min_free_gb
     ),
     class = "kv_config"
@@ -98,6 +92,17 @@ print.kv_config <- function(x, ...) {
   )
   cat("<kv_config>\n", paste0("  ", names(rows), ": ", rows, "\n"), sep = "")
   invisible(x)
+}
+
+# `workers` as a whole number, or an error if it isn't a positive one.
+as_workers <- function(workers) {
+  workers <- as_number(workers)
+  valid <- length(workers) == 1 && !is.na(workers) &&
+    workers >= 1 && workers %% 1 == 0
+  if (!valid) {
+    cli::cli_abort("{.arg workers} must be a single positive whole number.")
+  }
+  as.integer(workers)
 }
 
 # Paths with "~" expanded and no doubled or trailing slashes, so the paths

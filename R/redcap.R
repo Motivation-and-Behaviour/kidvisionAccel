@@ -58,6 +58,11 @@ rc_validate <- function(rcon, data) {
 
 # Imports records, replacing existing values, including with blanks.
 rc_import_records <- function(rcon, data) {
+  # redcapAPI turns values in number fields back into numbers before writing
+  # them as CSV, which would give small values such as 0.0004 in scientific
+  # notation
+  old <- options(scipen = 999)
+  on.exit(options(old), add = TRUE)
   response <- suppressMessages(redcapAPI::importRecords(
     rcon, data,
     overwriteBehavior = "overwrite", returnContent = "count"

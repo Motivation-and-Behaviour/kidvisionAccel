@@ -193,6 +193,15 @@ fake_run <- function(name, wait = 0, fail = FALSE) {
   list(name = name, args = list(wait = wait, fail = fail), log = "x.log")
 }
 
+test_that("kv_process() rejects an invalid worker count", {
+  config <- kv_config(work_dir = withr::local_tempdir())
+
+  expect_error(
+    kv_process(fake_jobs("9999"), config, workers = 0),
+    "positive whole number"
+  )
+})
+
 test_that("run_ggir_jobs() runs recordings in parallel", {
   local_fake_ggir()
   runs <- list(fake_run("a", 2), fake_run("b", 2), fake_run("c", 0))

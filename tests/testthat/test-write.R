@@ -173,8 +173,9 @@ test_that("kv_write() removes earlier results that no longer match", {
   expect_equal(jobs$redcap_status, c(6L, 5L, 3L))
   types <- vapply(calls$log, `[[`, "", "type")
   expect_equal(types, c(
-    # 1001: in progress, values blanked, files deleted, then the status
-    "validate", "records", "validate", "records", "delete", "delete",
+    # 1001: everything checked, then in progress, values blanked, files
+    # deleted, then the status
+    "validate", "validate", "records", "records", "delete", "delete",
     "records",
     # 1002 and 1003: kept, as they are processed again automatically
     "validate", "records", "validate", "records"
@@ -187,10 +188,56 @@ test_that("kv_write() removes earlier results that no longer match", {
   expect_equal(cleared$accelerometer_sleep_complete, "0")
   expect_false(any(c("cac_gen_wrist", "cac_gen_num") %in% names(cleared)))
   expect_equal(imports[[3]]$value$cac_proc_status, "6")
+  expect_equal(imports[[3]]$value$cac_proc_params, ggir_params_hash())
   deleted <- Filter(function(x) x$type == "delete", calls$log)
   expect_equal(
     vapply(deleted, function(x) x$value$field, ""),
     c("acc_pt2", "reports_accel")
+  )
+
+  # Kept results keep the versions and settings that produced them
+  provenance <- c(
+    "cac_proc_ggir", "cac_proc_pkg", "cac_proc_params", "cac_proc_nfiles"
+  )
+  for (kept in imports[4:5]) {
+    expect_false(any(provenance %in% names(kept$value)))
+    expect_true("cac_proc_notes" %in% names(kept$value))
+  }
+  expect_equal(imports[[4]]$value$cac_proc_status, "5")
+})
+
+test_that("kv_write() removes nothing if REDCap would reject the blanks", {
+  calls <- local_fake_redcap()
+  local_mocked_bindings(rc_validate = function(rcon, data) {
+    if ("cac_sum_mvpa" %in% names(data)) stop("bad blank")
+  })
+  jobs <- fake_jobs("1001")
+  jobs$status <- "needs_review"
+  jobs$has_results <- TRUE
+  jobs$uploaded_files <- list("acc_pt2")
+
+  jobs <- suppressMessages(kv_write(jobs, config_for(withr::local_tempdir())))
+
+  expect_equal(jobs$status, "write_failed")
+  expect_length(calls$log, 0)
+})
+
+test_that("kv_write() reports a status it couldn't record", {
+  calls <- local_fake_redcap()
+  local_mocked_bindings(rc_import_records = function(rcon, data) {
+    stop("timeout")
+  })
+  jobs <- fake_jobs("1001")
+  jobs$status <- "no_folder"
+  jobs$message <- "No participant folder."
+
+  jobs <- suppressMessages(kv_write(jobs, config_for(withr::local_tempdir())))
+
+  expect_equal(jobs$status, "write_failed")
+  expect_true(is.na(jobs$redcap_status))
+  expect_equal(jobs$message, "Writing to REDCap failed: timeout")
+  expect_equal(
+    jobs$notes[[1]], "Not processed (no folder): No participant folder."
   )
 })
 
@@ -260,6 +307,29 @@ test_that("rc_validate() accepts values REDCap keeps", {
   data <- data.frame(record_id = "1", cac_sum_mvpa = "33", cac_sum_noc = NA)
 
   expect_no_error(rc_validate("rcon", data))
+})
+
+test_that("rc_import_records() sends small numbers as plain decimals", {
+  scipen <- getOption("scipen")
+  sent <- NULL
+  local_mocked_bindings(
+    importRecords = function(rcon, data, ...) {
+      # As redcapAPI does for number fields
+      data$cac_gen_caliberror <- as.numeric(data$cac_gen_caliberror)
+      sent <<- utils::capture.output(
+        utils::write.csv(data, row.names = FALSE, na = "")
+      )
+      "1"
+    },
+    .package = "redcapAPI"
+  )
+
+  rc_import_records(
+    "rcon", data.frame(record_id = "1", cac_gen_caliberror = "0.0004")
+  )
+
+  expect_equal(sent[[2]], '"1",0.0004')
+  expect_equal(getOption("scipen"), scipen)
 })
 
 test_that("rc_import_records() checks REDCap imported every record", {

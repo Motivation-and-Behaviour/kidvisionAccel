@@ -145,17 +145,18 @@ two_files <- function(start2, end1 = "2025-03-19 09:00") {
 
 test_that("check_start_times() treats overlapping devices as a swap", {
   # The second device started 3 days in, while the first was still recording
-  expect_true(is.na(check_start_times(two_files("2025-03-13 09:00"), NA, NA,
-    tz, 3)))
+  expect_true(is.na(
+    check_start_times(two_files("2025-03-13 09:00"), NA, NA, tz)
+  ))
   # ...or up to 3 days after the first stopped
   expect_true(is.na(check_start_times(
-    two_files("2025-03-15 09:00", end1 = "2025-03-12 12:00"), NA, NA, tz, 3
+    two_files("2025-03-15 09:00", end1 = "2025-03-12 12:00"), NA, NA, tz
   )))
 })
 
 test_that("check_start_times() flags devices started together", {
   expect_match(
-    check_start_times(two_files("2025-03-10 15:00"), NA, NA, tz, 3),
+    check_start_times(two_files("2025-03-10 15:00"), NA, NA, tz),
     "started less than 24 hours apart"
   )
 })
@@ -164,7 +165,7 @@ test_that("check_start_times() flags a second attempt at a recording", {
   rewear <- two_files("2025-03-20 09:00", end1 = "2025-03-14 09:00")
 
   expect_match(
-    check_start_times(rewear, NA, NA, tz, 3),
+    check_start_times(rewear, NA, NA, tz),
     "6 days later, so they look like two attempts"
   )
 })
@@ -176,7 +177,7 @@ test_that("check_start_times() checks the start against the visit dates", {
     header_end = as.POSIXct("2025-03-19 09:00", tz = tz)
   )
   check <- function(visit1, visit2) {
-    check_start_times(files, as.Date(visit1), as.Date(visit2), tz, 3)
+    check_start_times(files, as.Date(visit1), as.Date(visit2), tz)
   }
 
   expect_true(is.na(check("2025-03-12", "2025-03-20")))

@@ -100,6 +100,24 @@ test_that("recording_files() flags files labelled as another participant", {
   expect_match(found$message, 'labelled as participant "1288"')
 })
 
+test_that("kv_locate() flags several files labelled as other participants", {
+  source_dir <- local_source(c(
+    accel("1001", file = bin_name("1288", "012345")),
+    accel("1001", file = bin_name("1289", "012346"))
+  ))
+
+  jobs <- suppressMessages(
+    kv_locate(fake_jobs("1001"), kv_config(source_dir = source_dir))
+  )
+
+  expect_equal(jobs$status, "needs_review")
+  expect_length(jobs$message, 1)
+  expect_match(
+    jobs$message,
+    'participant "1288"; .* participant "1289". Move them to'
+  )
+})
+
 test_that("recording_files() accepts subject codes with suffixes or none", {
   source_dir <- local_source(c(
     accel(file = bin_name("1001.1", "045999")),

@@ -24,7 +24,8 @@
 #   no_valid_days GGIR found no day or night with enough wear to use
 #   collate_failed GGIR's results couldn't be merged; it will be retried
 #   report_failed the report couldn't be created; it will be retried
-#   write_failed  writing to REDCap failed part-way; it will be retried
+#   write_failed  writing to REDCap failed; REDCap keeps its earlier status, or
+#                 "In progress" if it failed part-way
 
 job_statuses <- c(
   "pending", "located", "ready", "processed", "collated", "reported",
@@ -45,6 +46,8 @@ job_name <- function(jobs, i) {
 
 set_status <- function(jobs, i, status, message = NA_character_) {
   jobs$status[[i]] <- status
+  # A message built with vectorised glue() can have several parts
+  if (length(message) > 1) message <- paste(message, collapse = " ")
   jobs$message[[i]] <- message
   jobs
 }

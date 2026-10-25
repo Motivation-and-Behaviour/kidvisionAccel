@@ -18,8 +18,9 @@ against the REDCap project.}
 }
 \value{
 The job table, with the processing status recorded in REDCap in
-\code{redcap_status}. Recordings with a report have status \code{"written"}, or
-\code{"write_failed"} if writing failed.
+\code{redcap_status}. Recordings with a report have status \code{"written"}.
+Recordings that couldn't be written have status \code{"write_failed"}; for one
+that couldn't be processed, a note keeps why.
 }
 \description{
 Step 6 of the workflow. Records what happened to each recording in REDCap.
@@ -51,7 +52,8 @@ folder, or files that need a decision), or "Failed (cannot be processed)"
 REDCap has results from earlier processing, they no longer match the
 status, so the values are blanked, the files deleted and the instruments
 marked incomplete first. Results are kept for "No file found" and "Failed
-(will retry)", which are processed again automatically.
+(will retry)", which are processed again automatically, along with the
+GGIR version, settings and number of files that produced them.
 
 Every set of values is first checked against the REDCap project. A value
 REDCap wouldn't accept stops that recording, rather than being imported as

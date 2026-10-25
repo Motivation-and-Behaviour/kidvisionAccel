@@ -22,3 +22,12 @@ test_that("report_jobs() prints messages literally", {
 
   expect_true(any(grepl("A {brace} in a file name", out, fixed = TRUE)))
 })
+
+test_that("set_status() joins a message with several parts", {
+  jobs <- fake_jobs(c("1001", "1002"))
+
+  jobs <- set_status(jobs, 1, "needs_review", c("a.bin is wrong.", "So is b."))
+
+  expect_equal(jobs$message, c("a.bin is wrong. So is b.", NA))
+  expect_true(is.na(set_status(jobs, 1, "ready")$message[[1]]))
+})

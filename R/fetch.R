@@ -22,8 +22,8 @@
 #' * its timezone must be one used by `config$tz`. A device set up on a
 #'   computer in another timezone would have all its times shifted.
 #'
-#' The recording must start no more than `window_days` before visit 1, and
-#' before visit 2, or it may be in the wrong timepoint folder.
+#' The recording must start no more than 3 days before visit 1, and before
+#' visit 2, or it may be in the wrong timepoint folder.
 #'
 #' When a recording has several files, they are a device swap, and are
 #' appended by GGIR, if each device started 24 hours or more after the one
@@ -41,8 +41,6 @@
 #' @param config A [kv_config()] object.
 #' @param retries How many times to retry files that fail to copy.
 #' @param retry_wait Seconds to wait before each retry.
-#' @param window_days How many days before visit 1 a recording may start.
-#'   Devices are set up shortly before they are handed over.
 #'
 #' @return The job table, with each recording's folder in the work folder in
 #'   `job_dir` and, in `files`, the path of each copy in `local` and details
@@ -51,7 +49,7 @@
 #'   `"invalid_file"` or `"needs_review"`.
 #' @export
 kv_fetch <- function(jobs, config = kv_config(), retries = 5,
-                     retry_wait = 60, window_days = 3) {
+                     retry_wait = 60) {
   if (!"job_dir" %in% names(jobs)) jobs$job_dir <- NA_character_
   rows <- which(jobs$status == "located")
   if (length(rows) == 0) {
@@ -87,7 +85,7 @@ kv_fetch <- function(jobs, config = kv_config(), retries = 5,
       ))
       next
     }
-    jobs <- check_copies(jobs, i, config$tz, window_days)
+    jobs <- check_copies(jobs, i, config$tz)
   }
 
   report_jobs(jobs, "Fetch", rows)
@@ -118,7 +116,7 @@ check_space_for <- function(copies, work_dir) {
 }
 
 # Checks the copied files of job `i` and sets its status.
-check_copies <- function(jobs, i, tz, window_days) {
+check_copies <- function(jobs, i, tz) {
   files <- jobs$files[[i]]
   header <- purrr::list_rbind(lapply(files$local, inspect_bin, tz = tz))
   files <- dplyr::bind_cols(files, header[setdiff(names(header), "path")])
@@ -135,7 +133,7 @@ check_copies <- function(jobs, i, tz, window_days) {
   }
 
   problem <- check_start_times(
-    files, jobs$visit1_date[[i]], jobs$visit2_date[[i]], tz, window_days
+    files, jobs$visit1_date[[i]], jobs$visit2_date[[i]], tz
   )
   if (!is.na(problem)) {
     return(set_status(jobs, i, "needs_review", problem))
@@ -148,7 +146,7 @@ check_copies <- function(jobs, i, tz, window_days) {
 }
 
 # Returns why the recording's start times need review, or NA if they don't.
-check_start_times <- function(files, visit1, visit2, tz, window_days) {
+check_start_times <- function(files, visit1, visit2, tz) {
   name <- basename(files$path)
   when <- format(files$header_start, "%Y-%m-%d %H:%M")
   ended <- format(files$header_end, "%Y-%m-%d %H:%M")
@@ -187,7 +185,7 @@ check_start_times <- function(files, visit1, visit2, tz, window_days) {
   }
 
   start <- local_date(files$header_start)
-  early <- !is.na(visit1) & start < visit1 - window_days
+  early <- !is.na(visit1) & start < visit1 - max_early_start_days
   late <- !is.na(visit2) & !is.na(visit1) & visit2 >= visit1 & start > visit2
   outside <- early | late
   if (any(outside)) {
@@ -243,6 +241,10 @@ copy_notes <- function(files, device_num) {
 # The longest gap between one device stopping and the next starting that is
 # still treated as a device swap.
 max_swap_gap_days <- 3
+
+# How many days before visit 1 a recording may start. Devices are set up
+# shortly before they are handed over.
+max_early_start_days <- 3
 
 # Copies files, retrying failures. Returns the error message for each file,
 # or NA where it was copied.
