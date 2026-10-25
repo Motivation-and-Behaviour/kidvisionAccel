@@ -21,8 +21,8 @@ recording usually takes 3 to 5 minutes.}
 The job table, with GGIR's output folder in \code{ggir_dir} and the
 period it used in \code{study_first} and \code{study_last} (\code{NA} for the whole
 recording). Recordings GGIR processed have status \code{"processed"}; the
-others have status \code{"ggir_failed"}, \code{"invalid_file"}, \code{"needs_review"} or
-\code{"no_valid_days"}.
+others have status \code{"ggir_failed"}, \code{"ggir_timeout"}, \code{"invalid_file"},
+\code{"needs_review"} or \code{"no_valid_days"}.
 }
 \description{
 Step 3 of the workflow. Runs GGIR, with the settings in \code{\link[=ggir_params]{ggir_params()}}, on

@@ -89,6 +89,24 @@ local_ggir_output <- function(edit = NULL, stage = 6, env = parent.frame()) {
   ggir_dir
 }
 
+# The fixture's GGIR results, as read by read_ggir_results(), and its day
+# table.
+fixture_results <- function(edit = NULL, env = parent.frame()) {
+  read_ggir_results(local_ggir_output(edit, env = env))
+}
+
+fixture_days <- function(env = parent.frame()) {
+  day_table(fixture_results(env = env))
+}
+
+# Stands in for participant_details(), which reads REDCap.
+fake_participant_details <- function(config, ids) {
+  data.frame(
+    record_id = "9999", cid_namef = "Sam", pid_namef = "Alex",
+    cid_dob = "2008-01-15", consent_camera = "1"
+  )
+}
+
 # Edits one column of a GGIR result CSV.
 edit_result <- function(results, file, column, value) {
   path <- Sys.glob(file.path(results, file))

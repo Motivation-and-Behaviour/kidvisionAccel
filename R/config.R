@@ -20,6 +20,11 @@ timepoint_map <- tibble::tribble(
   "24m_visit_1_arm_1", "24m_visit_2_arm_1"
 )
 
+# Every REDCap event the pipeline reads.
+redcap_events <- c(
+  enrolment_event, timepoint_map$visit1_event, timepoint_map$visit2_event
+)
+
 # The folder holding the raw files within each timepoint folder.
 accel_folder <- "Accelerometer"
 
@@ -60,7 +65,7 @@ kv_config <- function(
   workers = env_or("KIDVISION_WORKERS", "1"),
   min_free_gb = 20
 ) {
-  workers <- suppressWarnings(as.numeric(workers))
+  workers <- as_number(workers)
   valid_workers <- length(workers) == 1 && !is.na(workers) &&
     workers >= 1 && workers %% 1 == 0
   if (!valid_workers) {

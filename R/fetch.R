@@ -59,7 +59,7 @@ kv_fetch <- function(jobs, config = kv_config(), retries = 5,
   }
 
   for (i in rows) {
-    name <- paste0(jobs$record_id[[i]], "_", jobs$timepoint[[i]])
+    name <- job_name(jobs, i)
     jobs$job_dir[[i]] <- file.path(config$work_dir, "jobs", name)
     files <- jobs$files[[i]]
     raw_dir <- file.path(jobs$job_dir[[i]], "raw")
@@ -105,8 +105,7 @@ copy_id <- function(files) {
 
 check_space_for <- function(copies, work_dir) {
   fs::dir_create(work_dir)
-  done <- file.exists(copies$local) &
-    file.size(copies$local) %in% copies$size
+  done <- is_copied(copies$local, copies$size)
   needed_gb <- sum(copies$size[!done]) / 1e9
   free_gb <- disk_free_gb(work_dir)
   if (needed_gb > free_gb) {
@@ -187,7 +186,7 @@ check_start_times <- function(files, visit1, visit2, tz, window_days) {
     }
   }
 
-  start <- as.Date(format(files$header_start, "%Y-%m-%d"))
+  start <- local_date(files$header_start)
   early <- !is.na(visit1) & start < visit1 - window_days
   late <- !is.na(visit2) & !is.na(visit1) & visit2 >= visit1 & start > visit2
   outside <- early | late
@@ -293,6 +292,9 @@ byte_progress <- function(total, .envir = parent.frame()) {
   }
 }
 
+# Whether each copy exists with its source's size, so needn't be copied again.
+is_copied <- function(to, size) (file.size(to) == size) %in% TRUE
+
 # Copies one file in chunks, so progress can be shown and a failed read
 # leaves nothing behind but an incomplete `.partial` file, which is removed.
 copy_file <- function(from, to, progress = function(n) NULL,
@@ -301,7 +303,7 @@ copy_file <- function(from, to, progress = function(n) NULL,
   if (is.na(size)) {
     stop("the file can't be found or read.", call. = FALSE)
   }
-  if (file.exists(to) && isTRUE(file.size(to) == size)) {
+  if (is_copied(to, size)) {
     progress(size)
     return(invisible(to))
   }

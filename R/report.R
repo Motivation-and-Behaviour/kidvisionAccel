@@ -59,16 +59,12 @@ participant_details <- function(config, record_ids) {
   rcon <- rc_connect(config)
   details <- rc_export(
     rcon,
-    fields = c(
-      "record_id", "cid_namef", "pid_namef", "cid_dob", "consent_camera"
-    ),
+    fields = c("record_id", report_fields),
     events = enrolment_event,
     records = record_ids
   )
-  for (field in c("cid_namef", "pid_namef", "cid_dob", "consent_camera")) {
-    if (is.null(details[[field]])) details[[field]] <- NA_character_
-    details[[field]] <- trimws(as.character(details[[field]]))
-    details[[field]][details[[field]] %in% ""] <- NA_character_
+  for (field in report_fields) {
+    details[[field]] <- blank_to_na(details[[field]], nrow(details))
   }
   details
 }
@@ -81,17 +77,10 @@ report_data <- function(days, child = NA, parent = NA, dob = NA,
   nights <- days[days$valid_night, ]
   age <- age_on(dob, days$date[1])
   guideline <- sleep_guideline(age)
-  child <- if (is.na(child)) NA_character_ else child
 
-  activity <- tibble::tibble(
-    date = valid$date,
-    label = day_label(valid$date),
-    weekend = valid$weekend,
-    mvpa = valid$mvpa
-  )
+  activity <- tibble::tibble(date = valid$date, mvpa = valid$mvpa)
   sleep <- tibble::tibble(
     date = nights$date,
-    label = day_label(nights$date),
     # Friday and Saturday nights come before a weekend day
     weekend = nights$weekday %in% c(5, 6),
     # The sleep period, from falling asleep to waking, which is compared with
@@ -104,7 +93,6 @@ report_data <- function(days, child = NA, parent = NA, dob = NA,
   )
 
   list(
-    child = child,
     child_label = if (is.na(child)) "Your child" else child,
     child_possessive = possessive(child),
     parent = if (is.na(parent)) NA_character_ else parent,
@@ -125,7 +113,6 @@ report_data <- function(days, child = NA, parent = NA, dob = NA,
       available = nrow(sleep) > 0,
       nights = nrow(sleep),
       average = format_hours(mean(sleep$period)),
-      average_asleep = format_hours(mean(sleep$asleep)),
       guideline = paste0(guideline[1], " to ", guideline[2], " hours"),
       guideline_range = guideline,
       bedtime = format_clock(stats::median(sleep$onset)),
@@ -190,10 +177,6 @@ timepoint_label <- function(timepoint) {
 }
 
 # Formatting for the report ----------------------------------------------------
-
-day_label <- function(date) {
-  format(date, "%a %e %b") |> gsub(pattern = "  ", replacement = " ")
-}
 
 format_date <- function(date) {
   trimws(format(date, "%e %B %Y"))

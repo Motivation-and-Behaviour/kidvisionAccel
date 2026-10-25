@@ -37,11 +37,12 @@ kv_locate <- function(jobs, config = kv_config()) {
   if (!"files" %in% names(jobs)) jobs$files <- rep(list(NULL), nrow(jobs))
 
   rows <- which(jobs$status == "pending")
+  source_folders <- folder_names(config$source_dir)
   no_participant_folder <- 0
   for (i in rows) {
     found <- recording_files(
       config$source_dir, jobs$record_id[[i]], jobs$timepoint[[i]],
-      tz = config$tz
+      tz = config$tz, source_folders = source_folders
     )
     no_participant_folder <- no_participant_folder +
       isTRUE(found$no_participant_folder)
@@ -97,8 +98,11 @@ participant_folders <- function(source_dir) {
 }
 
 # Finds the files for one recording. Returns a list with `status`, `message`,
-# `folder` (the accelerometer folder), `files` and `notes`.
-recording_files <- function(source_dir, record_id, timepoint, tz = "") {
+# `folder` (the accelerometer folder), `files` and `notes`. `source_folders`
+# is the names of the folders in `source_dir`, so callers can list it once
+# for many recordings.
+recording_files <- function(source_dir, record_id, timepoint, tz = "",
+                            source_folders = folder_names(source_dir)) {
   result <- function(status, message = NA_character_, folder = NA_character_,
                      files = NULL, notes = character(), ...) {
     list(
@@ -106,40 +110,40 @@ recording_files <- function(source_dir, record_id, timepoint, tz = "") {
       notes = notes, ...
     )
   }
+  # A folder that wasn't found is misnamed if there are variants of it
+  not_found <- function(found, name, status, message, ...) {
+    if (length(found$variants) > 0) {
+      return(result("misnamed", rename_message(found, name, source_dir)))
+    }
+    result(status, message, ...)
+  }
 
   participant <- find_folder(
-    source_dir, record_id, paste0("(^|\\D)", record_id, "(\\D|$)")
+    source_dir, record_id, paste0("(^|\\D)", record_id, "(\\D|$)"),
+    source_folders
   )
   if (is.na(participant$path)) {
-    if (length(participant$variants) > 0) {
-      return(result(
-        "misnamed", rename_message(participant, record_id, source_dir)
-      ))
-    }
-    return(result(
-      "no_folder", "No participant folder.", no_participant_folder = TRUE
+    return(not_found(
+      participant, record_id, "no_folder", "No participant folder.",
+      no_participant_folder = TRUE
     ))
   }
 
   tp <- timepoint_map[timepoint_map$timepoint == timepoint, ]
   timepoint_dir <- find_folder(participant$path, tp$folder, tp$misnamed_pattern)
   if (is.na(timepoint_dir$path)) {
-    if (length(timepoint_dir$variants) > 0) {
-      return(result(
-        "misnamed", rename_message(timepoint_dir, tp$folder, source_dir)
-      ))
-    }
-    return(result("no_folder", glue::glue("No {tp$folder} folder.")))
+    return(not_found(
+      timepoint_dir, tp$folder, "no_folder",
+      glue::glue("No {tp$folder} folder.")
+    ))
   }
 
   accel_dir <- find_folder(timepoint_dir$path, accel_folder, "^accel")
   if (is.na(accel_dir$path)) {
-    if (length(accel_dir$variants) > 0) {
-      return(result(
-        "misnamed", rename_message(accel_dir, accel_folder, source_dir)
-      ))
-    }
-    return(result("no_files", glue::glue("No {accel_folder} folder.")))
+    return(not_found(
+      accel_dir, accel_folder, "no_files",
+      glue::glue("No {accel_folder} folder.")
+    ))
   }
 
   files <- bin_files(accel_dir$path, tz)
@@ -153,21 +157,26 @@ recording_files <- function(source_dir, record_id, timepoint, tz = "") {
   )
 }
 
-# Looks for a folder called `name` (ignoring case) in `parent`. If it isn't
-# there, `variants` lists folders matching `pattern` that look like misnamed
-# versions of it.
-find_folder <- function(parent, name, pattern) {
-  folders <- if (fs::dir_exists(parent)) {
-    basename(fs::dir_ls(parent, type = "directory"))
-  } else {
-    character()
-  }
+# Looks for a folder called `name` (ignoring case) in `parent`, whose folders
+# are `folders`. If it isn't there, `variants` lists folders matching
+# `pattern` that look like misnamed versions of it.
+find_folder <- function(parent, name, pattern,
+                        folders = folder_names(parent)) {
   exact <- folders[tolower(folders) == tolower(name)]
   if (length(exact) == 1) {
     return(list(path = file.path(parent, exact), variants = character()))
   }
   variants <- folders[grepl(pattern, folders, ignore.case = TRUE, perl = TRUE)]
   list(path = NA_character_, parent = parent, variants = variants)
+}
+
+# The names of the folders in `parent`, or none if it doesn't exist.
+folder_names <- function(parent) {
+  if (fs::dir_exists(parent)) {
+    basename(fs::dir_ls(parent, type = "directory"))
+  } else {
+    character()
+  }
 }
 
 rename_message <- function(found, name, source_dir) {
@@ -302,7 +311,7 @@ check_shared_files <- function(jobs, rows) {
 # downloaded on or before the visit 1 date can't be this timepoint's recording.
 check_download_date <- function(jobs, i) {
   files <- jobs$files[[i]]
-  downloaded <- as.Date(format(files$downloaded, "%Y-%m-%d"))
+  downloaded <- local_date(files$downloaded)
   early <- (downloaded <= jobs$visit1_date[[i]]) %in% TRUE
   if (!any(early)) {
     return(jobs)
@@ -333,11 +342,14 @@ kv_audit_folders <- function(config = kv_config()) {
   check_source_mounted(config$source_dir)
   source_dir <- config$source_dir
   participants <- fs::dir_ls(source_dir, type = "directory")
-  participants <- participants[!basename(participants) %in% ignored_folders]
+  source_folders <- basename(participants)
+  participants <- participants[!source_folders %in% ignored_folders]
 
   issues <- dplyr::bind_rows(
     folder_issue(character(), character(), character()),
-    unname(lapply(participants, audit_participant, source_dir, config$tz))
+    unname(lapply(
+      participants, audit_participant, source_dir, config$tz, source_folders
+    ))
   )
   issues$folder <- as.character(fs::path_rel(issues$folder, source_dir))
   cli::cli_inform(c(
@@ -354,7 +366,7 @@ folder_issue <- function(folder, problem, fix) {
   )
 }
 
-audit_participant <- function(participant, source_dir, tz) {
+audit_participant <- function(participant, source_dir, tz, source_folders) {
   record_id <- basename(participant)
   if (!grepl("^[0-9]+$", record_id)) {
     return(folder_issue(
@@ -379,7 +391,8 @@ audit_participant <- function(participant, source_dir, tz) {
       ))
     }
     found <- recording_files(
-      source_dir, record_id, timepoint_map$timepoint[exact], tz = tz
+      source_dir, record_id, timepoint_map$timepoint[exact], tz = tz,
+      source_folders = source_folders
     )
     if (found$status == "misnamed") {
       return(folder_issue(folder, "Misnamed accelerometer folder", glue::glue(

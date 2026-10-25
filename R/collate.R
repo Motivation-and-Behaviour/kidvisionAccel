@@ -94,10 +94,7 @@ collate_job <- function(jobs, i, config) {
 }
 
 read_ggir_results <- function(ggir_dir) {
-  paths <- vapply(
-    names(ggir_results_files), ggir_result_path, "",
-    ggir_dir = ggir_dir
-  )
+  paths <- ggir_result_paths(ggir_dir)
   if (anyNA(paths)) {
     stop("missing ", paste(ggir_results_files[is.na(paths)], collapse = ", "))
   }

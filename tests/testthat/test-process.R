@@ -54,7 +54,9 @@ test_that("check_ggir_output() reports GGIR errors and timeouts", {
     failed$message,
     "GGIR stopped with an error after part 2: bad header. See x.log."
   )
-  expect_match(check(ggir_dir, error = timeout)$message, "didn't finish in time")
+  timed_out <- check(ggir_dir, error = timeout)
+  expect_equal(timed_out$status, "ggir_timeout")
+  expect_match(timed_out$message, "didn't finish in time")
 })
 
 test_that("check_ggir_output() reports missing results", {

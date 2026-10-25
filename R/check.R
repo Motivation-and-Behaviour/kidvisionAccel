@@ -86,7 +86,7 @@ check_versions <- function() {
         "{pkg} is not installed. {install}"
       )))
     }
-    if (package_version(installed) != package_version(pinned)) {
+    if (!same_version(installed, pinned)) {
       return(check_result(check, "fail", glue::glue(
         "{pkg} {installed} is installed, but {pinned} is required. {install}"
       )))
@@ -146,9 +146,10 @@ check_source_dir <- function(path) {
 check_work_dir <- function(path, min_free_gb) {
   check <- "Work folder"
   if (!nzchar(path)) {
-    return(check_result(check, "fail", paste(
+    return(check_result(
+      check, "fail",
       "Not set. Set KIDVISION_WORK_DIR to a local folder for temporary files."
-    )))
+    ))
   }
   if (!fs::dir_exists(path)) {
     return(check_result(check, "fail", glue::glue("{path} does not exist.")))
@@ -172,12 +173,7 @@ disk_free_gb <- function(path) {
 
 check_quarto <- function() {
   check <- "Quarto"
-  quarto <- Sys.which("quarto")
-  if (!nzchar(quarto)) {
-    return(check_result(check, "fail", paste(
-      "Quarto was not found. It is needed to render participant reports."
-    )))
-  }
+  quarto <- quarto_path()
   run <- function(args) {
     out <- suppressWarnings(system2(quarto, args, stdout = TRUE, stderr = TRUE))
     if (!is.null(attr(out, "status"))) NULL else out[[1]]
@@ -258,17 +254,14 @@ check_redcap_fields <- function(metadata, dry_run) {
 }
 
 check_redcap_events <- function(events) {
-  needed <- c(
-    enrolment_event, timepoint_map$visit1_event, timepoint_map$visit2_event
-  )
-  missing <- setdiff(needed, events$unique_event_name)
+  missing <- setdiff(redcap_events, events$unique_event_name)
   if (length(missing) > 0) {
     return(check_result("REDCap events", "fail", glue::glue(
       "Missing from the project: {collapse_names(missing)}."
     )))
   }
   check_result("REDCap events", "pass", glue::glue(
-    "All {length(needed)} events exist"
+    "All {length(redcap_events)} events exist"
   ))
 }
 

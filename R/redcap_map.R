@@ -35,9 +35,12 @@ summary_fields <- c(
   "cac_sum_noc", "cac_sum_onset", "cac_sum_wake", "cac_sum_timeinbed"
 )
 
-# File uploads. A recording counts as processed once all of these are present
-# (for records processed before the status fields existed).
-file_fields <- c("acc_pt2", "acc_pt4", "acc_pt5", "acc_pt6", "reports_accel")
+# File uploads, by what they hold. A recording counts as processed once all of
+# these are present (for records processed before the status fields existed).
+file_fields <- c(
+  part2 = "acc_pt2", part4 = "acc_pt4", part5 = "acc_pt5", part6 = "acc_pt6",
+  report = "reports_accel"
+)
 
 # Processing status and provenance. These are not in the original project and
 # are added to the accelerometer_output instrument by hand.
@@ -46,18 +49,21 @@ status_fields <- c(
   "cac_proc_params", "cac_proc_nfiles", "cac_proc_notes"
 )
 
+# Exported by kv_report() to personalise the report.
+report_fields <- c("cid_namef", "pid_namef", "cid_dob", "consent_camera")
+
 # Read to decide what to process and to personalise the report.
 read_fields <- c(
-  "cid_namef", "pid_namef", "cid_dob", "consent_geneactiv", "consent_camera",
-  "withdrawn_existingdata", "dropout_existingdata",
-  "sop_date", "sop2_date", "sop2_postchecklist", "cac_gen_num"
+  report_fields, "consent_geneactiv", "withdrawn_existingdata",
+  "dropout_existingdata", "sop_date", "sop2_date", "sop2_postchecklist",
+  "cac_gen_num"
 )
 
 # Exported by kv_pending() to decide what to process.
 pending_fields <- c(
   "record_id", "consent_geneactiv", "withdrawn_existingdata",
   "dropout_existingdata", "sop_date", "sop2_date", "sop2_postchecklist",
-  "cac_gen_num", file_fields, "cac_proc_status", "cac_proc_ggir",
+  "cac_gen_num", unname(file_fields), "cac_proc_status", "cac_proc_ggir",
   "cac_proc_params"
 )
 
@@ -168,8 +174,9 @@ summary_values <- function(days, results) {
 # Numbers as plain decimals rounded to `digits` places (never scientific
 # notation, which REDCap rejects), or NA.
 format_number <- function(x, digits) {
-  out <- formatC(round(x, digits), format = "f", digits = digits)
-  out <- sub("[.]?0+$", "", out)
+  out <- formatC(
+    round(x, digits), format = "f", digits = digits, drop0trailing = TRUE
+  )
   out[is.na(x)] <- NA_character_
   out
 }

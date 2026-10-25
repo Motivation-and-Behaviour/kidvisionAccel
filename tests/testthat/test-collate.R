@@ -1,7 +1,3 @@
-fixture_results <- function(edit = NULL, env = parent.frame()) {
-  read_ggir_results(local_ggir_output(edit, env = env))
-}
-
 test_that("read_ggir_results() reads every result file", {
   results <- fixture_results()
 

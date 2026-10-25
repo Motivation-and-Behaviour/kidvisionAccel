@@ -3,9 +3,7 @@ fake_metadata <- function(drop = character()) {
 }
 
 fake_events <- function() {
-  data.frame(unique_event_name = c(
-    enrolment_event, timepoint_map$visit1_event, timepoint_map$visit2_event
-  ))
+  data.frame(unique_event_name = redcap_events)
 }
 
 fake_export <- function(rcon, fields, events = NULL, records = NULL) {

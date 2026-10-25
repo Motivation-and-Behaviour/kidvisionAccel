@@ -40,7 +40,7 @@
 #' @export
 kv_write <- function(jobs, config = kv_config(), dry_run = FALSE) {
   if (!"redcap_status" %in% names(jobs)) jobs$redcap_status <- NA_integer_
-  rows <- which(!is.na(redcap_status_code(jobs$status, jobs$message)))
+  rows <- which(!is.na(redcap_status_code(jobs$status)))
   if (length(rows) == 0) {
     return(report_jobs(jobs, "Write", rows))
   }
@@ -74,28 +74,18 @@ kv_write <- function(jobs, config = kv_config(), dry_run = FALSE) {
 
 # The REDCap processing status (cac_proc_status) for each job status, or NA
 # for jobs that haven't finished.
-redcap_status_code <- function(status, message) {
-  code <- c(
+redcap_status_code <- function(status) {
+  unname(c(
     reported = 1L, no_folder = 3L, no_files = 3L, no_valid_days = 4L,
-    copy_failed = 5L, report_failed = 5L, misnamed = 6L, needs_review = 6L,
-    ggir_failed = 7L, invalid_file = 7L
-  )[status]
-  # Running out of time can be temporary, so is tried again
-  timed_out <- status %in% "ggir_failed" &
-    grepl("didn't finish in time", message, fixed = TRUE)
-  code[timed_out] <- 5L
-  unname(code)
+    copy_failed = 5L, ggir_timeout = 5L, report_failed = 5L, misnamed = 6L,
+    needs_review = 6L, ggir_failed = 7L, invalid_file = 7L
+  )[status])
 }
 
 # Forms marked complete once a recording's results are in REDCap.
 completed_forms <- c(
   "accelerometer_physical_activity", "accelerometer_sleep",
   "accelerometer_time", "accelerometer_output", "participant_reports"
-)
-
-# The REDCap fields each uploaded file goes into.
-file_fields_by_part <- c(
-  part2 = "acc_pt2", part4 = "acc_pt4", part5 = "acc_pt5", part6 = "acc_pt6"
 )
 
 write_results <- function(jobs, i, writer, config) {
@@ -108,11 +98,10 @@ write_results <- function(jobs, i, writer, config) {
 
   writer$records(status_record(jobs, i, 0L, config, brief = TRUE), "1_status")
   writer$records(values, "2_values")
-  files <- jobs$part_files[[i]]
-  for (part in names(file_fields_by_part)) {
-    writer$file(files[[part]], file_fields_by_part[[part]])
+  files <- c(jobs$part_files[[i]], report = jobs$report[[i]])
+  for (part in names(file_fields)) {
+    writer$file(files[[part]], file_fields[[part]])
   }
-  writer$file(jobs$report[[i]], "reports_accel")
   writer$records(done, "3_status")
 
   jobs$redcap_status[[i]] <- code
@@ -120,7 +109,7 @@ write_results <- function(jobs, i, writer, config) {
 }
 
 write_status_only <- function(jobs, i, writer, config) {
-  code <- redcap_status_code(jobs$status[[i]], jobs$message[[i]])
+  code <- redcap_status_code(jobs$status[[i]])
   record <- status_record(jobs, i, code, config)
   writer$validate(record)
   writer$records(record, "status")

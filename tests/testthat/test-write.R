@@ -1,17 +1,13 @@
 test_that("redcap_status_code() maps each outcome to a REDCap status", {
   statuses <- c(
     "reported", "no_folder", "no_files", "no_valid_days", "copy_failed",
-    "report_failed", "misnamed", "needs_review", "ggir_failed",
-    "invalid_file", "pending", "collated"
+    "report_failed", "ggir_timeout", "misnamed", "needs_review",
+    "ggir_failed", "invalid_file", "pending", "collated"
   )
 
   expect_equal(
-    redcap_status_code(statuses, NA_character_),
-    c(1L, 3L, 3L, 4L, 5L, 5L, 6L, 6L, 7L, 7L, NA, NA)
-  )
-  expect_equal(
-    redcap_status_code("ggir_failed", "GGIR didn't finish in time. See x."),
-    5L
+    redcap_status_code(statuses),
+    c(1L, 3L, 3L, 4L, 5L, 5L, 5L, 6L, 6L, 7L, 7L, NA, NA)
   )
 })
 

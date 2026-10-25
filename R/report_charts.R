@@ -87,6 +87,14 @@ crowded <- function(table) nrow(table) > 9
 
 value_size <- function(table) if (crowded(table)) 2.7 else 3.4
 
+# Value labels on the bars or ranges of a chart.
+value_text <- function(table, ..., shrink = 0) {
+  ggplot2::geom_text(
+    ..., family = report_font, size = value_size(table) - shrink,
+    colour = report_colours[["ink"]]
+  )
+}
+
 crowded_axis <- function(table) {
   if (crowded(table)) {
     ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8.5))
@@ -101,10 +109,8 @@ chart_activity <- function(table) {
     ggplot2::geom_hline(
       yintercept = 60, linetype = "dashed", colour = report_colours[["ink"]]
     ) +
-    ggplot2::geom_text(
-      ggplot2::aes(label = paste(round(.data$mvpa))),
-      vjust = -0.5, family = report_font, size = value_size(table),
-      colour = report_colours[["ink"]]
+    value_text(
+      table, ggplot2::aes(label = paste(round(.data$mvpa))), vjust = -0.5
     ) +
     ggplot2::scale_y_continuous(
       limits = c(0, top), expand = c(0, 0),
@@ -139,11 +145,9 @@ chart_sleep <- function(table, guideline) {
       ymax = guideline[2], fill = "#EFE8FA"
     ) +
     ggplot2::geom_col(ggplot2::aes(fill = .data$part), width = 0.7) +
-    ggplot2::geom_text(
-      data = table,
-      ggplot2::aes(.data$night, .data$period, label = .data$label),
-      vjust = -0.5, family = report_font, size = value_size(table),
-      colour = report_colours[["ink"]]
+    value_text(
+      table, ggplot2::aes(.data$night, .data$period, label = .data$label),
+      data = table, vjust = -0.5
     ) +
     ggplot2::scale_fill_manual(values = c(
       "Asleep" = report_colours[["purple"]],
@@ -176,21 +180,17 @@ chart_timing <- function(table) {
       linewidth = 9
     ) +
     # The axis is reversed, so subtracting moves a label up the page
-    ggplot2::geom_text(
+    value_text(
+      table,
       ggplot2::aes(
-        y = .data$onset - 0.6,
-        label = vapply(.data$onset, clock, "")
+        y = .data$onset - 0.6, label = vapply(.data$onset, clock, "")
       ),
-      family = report_font, size = value_size(table) - 0.4,
-      colour = report_colours[["ink"]]
+      shrink = 0.4
     ) +
-    ggplot2::geom_text(
-      ggplot2::aes(
-        y = .data$wake + 0.6,
-        label = vapply(.data$wake, clock, "")
-      ),
-      family = report_font, size = value_size(table) - 0.4,
-      colour = report_colours[["ink"]]
+    value_text(
+      table,
+      ggplot2::aes(y = .data$wake + 0.6, label = vapply(.data$wake, clock, "")),
+      shrink = 0.4
     ) +
     ggplot2::scale_y_reverse(
       breaks = breaks, labels = vapply(breaks, axis_clock, ""),
@@ -211,10 +211,10 @@ chart_efficiency <- function(table) {
   table$night <- date_axis(table)
   ggplot2::ggplot(table, ggplot2::aes(.data$night, .data$efficiency)) +
     ggplot2::geom_col(fill = report_colours[["violet"]], width = 0.7) +
-    ggplot2::geom_text(
+    value_text(
+      table,
       ggplot2::aes(label = vapply(.data$efficiency, format_percent, "")),
-      vjust = -0.5, family = report_font, size = value_size(table),
-      colour = report_colours[["ink"]]
+      vjust = -0.5
     ) +
     ggplot2::scale_y_continuous(
       limits = c(0, 1.12), breaks = seq(0, 1, by = 0.25), expand = c(0, 0),

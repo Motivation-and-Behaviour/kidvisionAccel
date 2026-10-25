@@ -19,7 +19,8 @@
 #   needs_review  the files need a person to decide what to use
 #   invalid_file  a file is unreadable, incomplete, too short or corrupt
 #   copy_failed   copying from OneDrive failed; it will be retried next run
-#   ggir_failed   GGIR stopped with an error or didn't finish
+#   ggir_failed   GGIR stopped with an error or without writing its results
+#   ggir_timeout  GGIR ran out of time; it will be retried
 #   no_valid_days GGIR found no day with enough wear to use
 #   report_failed the report couldn't be created; it will be retried
 #   write_failed  writing to REDCap failed part-way; it will be retried
@@ -27,14 +28,18 @@
 job_statuses <- c(
   "pending", "located", "ready", "processed", "collated", "reported",
   "written", "no_folder", "no_files", "misnamed", "needs_review",
-  "invalid_file", "copy_failed", "ggir_failed", "no_valid_days",
-  "report_failed", "write_failed"
+  "invalid_file", "copy_failed", "ggir_failed", "ggir_timeout",
+  "no_valid_days", "report_failed", "write_failed"
 )
 
 add_note <- function(jobs, i, note, check = TRUE) {
   jobs$notes[[i]] <- c(jobs$notes[[i]], note)
   jobs$check_notes[[i]] <- jobs$check_notes[[i]] || check
   jobs
+}
+
+job_name <- function(jobs, i) {
+  paste0(jobs$record_id[[i]], "_", jobs$timepoint[[i]])
 }
 
 set_status <- function(jobs, i, status, message = NA_character_) {
@@ -59,7 +64,7 @@ report_jobs <- function(jobs, step, rows = seq_len(nrow(jobs))) {
 
   actionable <- c(
     "misnamed", "needs_review", "invalid_file", "copy_failed", "ggir_failed",
-    "report_failed", "write_failed"
+    "ggir_timeout", "report_failed", "write_failed"
   )
   problems <- jobs[intersect(rows, which(jobs$status %in% actionable)), ]
   if (nrow(problems) > 0) {

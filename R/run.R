@@ -57,7 +57,7 @@ kv_run <- function(
     return(invisible(jobs))
   }
   jobs <- kv_locate(jobs, config)
-  order <- paste(jobs$record_id, jobs$timepoint)
+  keys <- paste(jobs$record_id, jobs$timepoint)
 
   # Recordings that stopped at locate only need their status recording
   stopped <- jobs[jobs$status != "located", ]
@@ -82,7 +82,7 @@ kv_run <- function(
   }
 
   jobs <- dplyr::bind_rows(done)
-  jobs <- jobs[order(match(paste(jobs$record_id, jobs$timepoint), order)), ]
+  jobs <- jobs[order(match(paste(jobs$record_id, jobs$timepoint), keys)), ]
   log <- write_run_log(jobs, config, started)
   cli::cli_rule("Done")
   report_jobs(jobs, "Run", rows = integer())
@@ -119,15 +119,12 @@ write_run_log <- function(jobs, config, started) {
   path <- file.path(
     log_dir, paste0("run_", format(started, "%Y-%m-%d_%H%M%S"), ".csv")
   )
-  column <- function(name, default) {
-    if (name %in% names(jobs)) jobs[[name]] else rep(default, nrow(jobs))
-  }
   log <- tibble::tibble(
     record_id = jobs$record_id,
     timepoint = jobs$timepoint,
     reason = jobs$reason,
     status = jobs$status,
-    redcap_status = column("redcap_status", NA_integer_),
+    redcap_status = jobs$redcap_status,
     message = jobs$message,
     notes = vapply(jobs$notes, paste, character(1), collapse = " | ")
   )

@@ -33,11 +33,7 @@ test_that("kv_process() and kv_collate() process a recording with GGIR", {
   expect_equal(jobs$redcap[[1]]$cac_day2_full_mpa, "24")
 
   local_mocked_bindings(
-    participant_details = function(config, ids) {
-      data.frame(record_id = "9999", cid_namef = "Sam", pid_namef = "Alex",
-        cid_dob = "2008-01-15", consent_camera = "1"
-      )
-    },
+    participant_details = fake_participant_details,
     rc_connect = function(config) "rcon",
     rc_validate = function(rcon, data) invisible(data)
   )

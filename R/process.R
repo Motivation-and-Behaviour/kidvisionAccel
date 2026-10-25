@@ -29,8 +29,8 @@
 #' @return The job table, with GGIR's output folder in `ggir_dir` and the
 #'   period it used in `study_first` and `study_last` (`NA` for the whole
 #'   recording). Recordings GGIR processed have status `"processed"`; the
-#'   others have status `"ggir_failed"`, `"invalid_file"`, `"needs_review"` or
-#'   `"no_valid_days"`.
+#'   others have status `"ggir_failed"`, `"ggir_timeout"`, `"invalid_file"`,
+#'   `"needs_review"` or `"no_valid_days"`.
 #' @export
 kv_process <- function(jobs, config = kv_config(), timeout = 60,
                        workers = config$workers) {
@@ -60,10 +60,6 @@ kv_process <- function(jobs, config = kv_config(), timeout = 60,
   }
 
   report_jobs(jobs, "GGIR", rows)
-}
-
-job_name <- function(jobs, i) {
-  paste0(jobs$record_id[[i]], "_", jobs$timepoint[[i]])
 }
 
 # Sets up GGIR's output folder and arguments for job `i`. Returns the updated
@@ -180,7 +176,7 @@ check_ggir_output <- function(ggir_dir, record_id, n_files, error, log) {
 
   if (inherits(error, "callr_timeout_error")) {
     return(outcome(
-      "ggir_failed", paste0("GGIR didn't finish in time.", see_log)
+      "ggir_timeout", paste0("GGIR didn't finish in time.", see_log)
     ))
   }
   if (!is.null(error)) {
@@ -192,8 +188,8 @@ check_ggir_output <- function(ggir_dir, record_id, n_files, error, log) {
     )))
   }
 
-  quality <- ggir_result_path(ggir_dir, "quality")
-  if (!is.na(quality)) {
+  quality <- file.path(ggir_dir, "results", "QC", "data_quality_report.csv")
+  if (file.exists(quality)) {
     report <- read_ggir_csv(quality)
     for (flag in c("file.corrupt", "file.too.short")) {
       if (any(report[[flag]] %in% "TRUE")) {
@@ -205,15 +201,14 @@ check_ggir_output <- function(ggir_dir, record_id, n_files, error, log) {
     }
   }
 
-  paths <- vapply(names(ggir_results_files), ggir_result_path, "",
-    ggir_dir = ggir_dir
-  )
+  paths <- ggir_result_paths(ggir_dir)
   if (!is.na(paths[["part2_day"]])) {
     days <- read_ggir_csv(paths[["part2_day"]])
-    if (!any(as_number(days$`N valid hours`) >= 16, na.rm = TRUE)) {
-      return(outcome(
-        "no_valid_days", "No day had the 16 hours of wear needed."
-      ))
+    min_hours <- ggir_params()$includedaycrit[[1]]
+    if (!any(as_number(days$`N valid hours`) >= min_hours, na.rm = TRUE)) {
+      return(outcome("no_valid_days", glue::glue(
+        "No day had the {min_hours} hours of wear needed."
+      )))
     }
   }
   missing <- names(paths)[is.na(paths)]
@@ -254,15 +249,13 @@ ggir_results_files <- c(
   part6 = "part6_summary.csv"
 )
 
-# Path to one of GGIR's result files, or NA if it doesn't exist.
-ggir_result_path <- function(ggir_dir, file) {
-  pattern <- if (file == "quality") {
-    "QC/data_quality_report.csv"
-  } else {
-    ggir_results_files[[file]]
-  }
-  found <- Sys.glob(file.path(ggir_dir, "results", pattern))
-  if (length(found) == 1) found else NA_character_
+# Paths to GGIR's result files, named as in `ggir_results_files`, with NA for
+# any that don't exist.
+ggir_result_paths <- function(ggir_dir) {
+  vapply(ggir_results_files, function(pattern) {
+    found <- Sys.glob(file.path(ggir_dir, "results", pattern))
+    if (length(found) == 1) found else NA_character_
+  }, "")
 }
 
 # Describes how far GGIR got, from the milestone folder each part writes.
@@ -287,8 +280,6 @@ read_ggir_csv <- function(path) {
   )
 }
 
-as_number <- function(x) suppressWarnings(as.numeric(x))
-
 # The period GGIR should use: visit 1 to visit 2, if those dates are
 # plausible. Otherwise `reason` says why the whole recording is used.
 study_dates <- function(visit1, visit2, start, window_days = 3) {
@@ -300,7 +291,7 @@ study_dates <- function(visit1, visit2, start, window_days = 3) {
   if (days < 5 || days > 21) {
     return(skip(glue::glue("visit 2 was {days} days after visit 1")))
   }
-  start <- as.Date(format(start, "%Y-%m-%d"))
+  start <- local_date(start)
   if (is.na(start) || start < visit1 - window_days || start > visit1) {
     return(skip(glue::glue(
       "the recording started on {start}, but visit 1 was {visit1}"

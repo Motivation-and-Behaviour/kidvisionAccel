@@ -48,22 +48,23 @@ kv_pending <- function(
   records <- rc_export(
     rcon,
     fields = pending_fields,
-    events = c(
-      enrolment_event, timepoint_map$visit1_event, timepoint_map$visit2_event
-    )
+    events = redcap_events
   )
   recordings <- recording_states(records)
 
   # A recording with no file found is retried once a file appears. Only
   # folder listings are read, so nothing is downloaded.
   recheck <- recordings$state == "no file"
+  source_folders <- folder_names(config$source_dir)
   recordings$has_new_file <- FALSE
   recordings$has_new_file[recheck] <- purrr::map2_lgl(
     recordings$record_id[recheck],
     recordings$timepoint[recheck],
     function(id, tp) {
-      !recording_files(config$source_dir, id, tp)$status %in%
-        c("no_folder", "no_files")
+      found <- recording_files(
+        config$source_dir, id, tp, source_folders = source_folders
+      )
+      !found$status %in% c("no_folder", "no_files")
     }
   )
 
@@ -75,12 +76,7 @@ kv_pending <- function(
 # One row per participant and timepoint (visit 2 event), with what is known
 # about the recording from REDCap and its `state`.
 recording_states <- function(records) {
-  value <- function(x) {
-    x <- if (is.null(x)) rep(NA_character_, nrow(records)) else x
-    x <- trimws(as.character(x))
-    x[x == ""] <- NA_character_
-    x
-  }
+  value <- function(x) blank_to_na(x, nrow(records))
   event <- value(records$redcap_event_name)
 
   # Consent and data-removal requests apply to every timepoint
@@ -157,7 +153,7 @@ recording_states <- function(records) {
   )
 
   order <- order(
-    suppressWarnings(as.numeric(recordings$record_id)),
+    as_number(recordings$record_id),
     recordings$record_id,
     match(recordings$timepoint, timepoint_map$timepoint)
   )

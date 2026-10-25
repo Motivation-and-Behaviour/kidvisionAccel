@@ -1,7 +1,3 @@
-fixture_days <- function(env = parent.frame()) {
-  day_table(read_ggir_results(local_ggir_output(env = env)))
-}
-
 test_that("report_data() summarises activity and sleep", {
   data <- report_data(
     fixture_days(), child = "Sam", parent = "Alex",
@@ -94,7 +90,6 @@ test_that("report formatting is written for families", {
   expect_equal(axis_clock(24), "midnight")
   expect_equal(axis_clock(36), "noon")
   expect_equal(format_percent(0.796), "80%")
-  expect_equal(day_label(as.Date("2022-10-01")), "Sat 1 Oct")
 })
 
 test_that("write_report_charts() draws only charts with data", {
@@ -158,11 +153,7 @@ collated_job <- function(work_dir) {
 }
 
 test_that("kv_report() creates each recording's report", {
-  local_mocked_bindings(participant_details = function(config, ids) {
-    data.frame(record_id = "9999", cid_namef = "Sam", pid_namef = "Alex",
-      cid_dob = "2008-01-15", consent_camera = "1"
-    )
-  })
+  local_mocked_bindings(participant_details = fake_participant_details)
   work_dir <- withr::local_tempdir()
 
   jobs <- suppressMessages(kv_report(collated_job(work_dir), kv_config()))
@@ -195,7 +186,7 @@ test_that("kv_report() marks reports that can't be created", {
 
 test_that("crowded charts get compact labels without rounding to :60", {
   table <- tibble::tibble(
-    date = as.Date("2025-05-27") + 0:11, label = "x", weekend = FALSE,
+    date = as.Date("2025-05-27") + 0:11,
     period = c(9.9999, rep(10.5, 11)), asleep = 9,
     efficiency = 0.9, onset = 22, wake = 31
   )
