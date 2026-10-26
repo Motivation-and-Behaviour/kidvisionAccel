@@ -1,52 +1,28 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/rocker-org/devcontainer-templates/tree/main/src/r-ver
 {
-  "name": "R (rocker/r-ver base)",
-  // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-  "image": "ghcr.io/rocker-org/devcontainer/tidyverse:4.4",
-  // Features to add to the dev container. More info: https://containers.dev/features.
-  "features": {
-    "ghcr.io/rocker-org/devcontainer-features/pandoc:1": {},
-    "ghcr.io/rocker-org/devcontainer-features/quarto-cli:1": {},
-    "ghcr.io/rocker-org/devcontainer-features/renv-cache:latest": {},
-    "ghcr.io/rocker-org/devcontainer-features/r-apt:0": {
-      "vscodeRSupport": "full",
-      "installDevTools": true,
-      "installRMarkdown": true,
-      "installRadian": true,
-      "installVscDebugger": true
-    },
-    "ghcr.io/rocker-org/devcontainer-features/r-packages:1": {
-      "packages": "github::cran/GGIR@3.1-4, pagedown, github::rfortherestofus/pagedreport, redcapAPI",
-      "installSystemRequirements": true
-    }
+  "name": "KidvisionAccel",
+  "image": "ghcr.io/tarensanders/r-base:latest",
+  // Runs on the WSL host before the container starts. Creates the work folder,
+  // a placeholder used when KIDVISION_ONEDRIVE is unset (kv_check() then
+  // reports that no participant folders were found), and an empty .env.
+  "initializeCommand": "mkdir -p \"$HOME/kidvision_work\" /tmp/kidvision_onedrive_not_set && touch \"${localWorkspaceFolder}/.env\"",
+  "runArgs": ["--env-file", "${localWorkspaceFolder}/.env"],
+  "containerEnv": {
+    "TZ": "Australia/Sydney",
+    "KIDVISION_SOURCE_DIR": "/onedrive",
+    "KIDVISION_WORK_DIR": "/work"
   },
   "mounts": [
-    "source=/home/taren/Projects/kidvision,target=/data,type=bind"
+    "source=claude-code-config-${devcontainerId},target=/home/rstudio/.claude,type=volume",
+    "source=gh-config-${devcontainerId},target=/home/rstudio/.gh,type=volume",
+    "source=${localEnv:HOME}/Projects/square_eyes_tmp,target=/data,type=bind",
+    // The synced 'Square Eyes - Community Sample' folder, read-only. Set
+    // KIDVISION_ONEDRIVE in WSL (see README) before opening the container.
+    "source=${localEnv:KIDVISION_ONEDRIVE:/tmp/kidvision_onedrive_not_set},target=/onedrive,type=bind,readonly",
+    "source=${localEnv:HOME}/kidvision_work,target=/work,type=bind"
   ],
-  // Use 'forwardPorts' to make a list of ports inside the container available locally.
-  // "forwardPorts": [],
-  // Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "chmod +x ./install_chrome.sh && ./install_chrome.sh",
-  // Configure tool-specific properties.
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        "ms-azuretools.vscode-docker", // Makes it easy to create, manage, and debug containerized applications
-        "yzhang.markdown-all-in-one", // All you need to write Markdown (keyboard shortcuts, table of contents, auto preview and more)
-        "tomoki1207.pdf", // Display pdf file in VSCode
-        "REditorSupport.r",
-        "REditorSupport.r-lsp", // R Extension for Visual Studio Code
-        "RDebugger.r-debugger", // R Debugger for VS Code
-        "christian-kohler.path-intellisense", // Visual Studio Code plugin that autocompletes filenames
-        "ionutvmi.path-autocomplete",
-        "GitHub.vscode-pull-request-github",
-        "GitHub.copilot",
-        "GitHub.copilot-chat",
-        "mechatroner.rainbow-csv"
-      ]
-    }
-  }
-  // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-  // "remoteUser": "root"
+  "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind,consistency=cached",
+  "workspaceFolder": "${localWorkspaceFolder}",
+  // Installs the dependencies in DESCRIPTION, including the pinned GGIR and
+  // GGIRread from its Remotes field.
+  "postCreateCommand": "sudo chown -R $(id -un):$(id -gn) $HOME/.claude $HOME/.gh && Rscript -e 'pak::local_install_dev_deps(upgrade = FALSE)'"
 }

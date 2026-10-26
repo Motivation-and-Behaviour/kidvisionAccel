@@ -1,28 +1,48 @@
 Package: kidvisionAccel
 Title: Opinionated Accelerometer Processing and Reporting for the KidVision Project
-Version: 0.0.0.9000
-Authors@R: 
+Version: 0.1.0
+Authors@R:
     person("Taren", "Sanders", , "taren.sanders@acu.edu.au", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-4504-6008"))
-Description: A package that wraps functions to process accelerometer data for particpants in the KidVision project. It ensures that data are processed consistently, produced in a format that can be uploaded the REDCap, and creates a summary report for the participant.
+Description: Processes accelerometer data for participants in the KidVision
+    project. It finds participants whose data have not yet been processed in
+    REDCap, copies their raw GENEActiv files from the project's OneDrive
+    folder, processes them with a pinned version of 'GGIR' using settings
+    chosen for primary-school children, imports the results into REDCap, and
+    creates a summary report for each participant.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
+RoxygenNote: 8.0.0
 URL: https://github.com/Motivation-and-Behaviour/kidvisionAccel
 BugReports: https://github.com/Motivation-and-Behaviour/kidvisionAccel/issues
-Imports: 
-    dplyr,
-    GGIR (>= 3.1-4),
-    ggplot2,
+Depends:
+    R (>= 4.1.0)
+Imports:
+    callr,
+    cli,
+    dplyr (>= 1.1.0),
+    fs,
+    ggplot2 (>= 3.4.0),
+    GGIR (>= 3.3-9),
+    GGIRread (>= 1.0.11),
     glue,
-    pagedown,
-    pagedreport (>= 0.1),
-    readr,
+    jsonlite,
+    ps,
+    purrr (>= 1.0.0),
+    ragg,
     redcapAPI,
-    rlang,
+    rlang (>= 1.1.0),
+    systemfonts,
+    tibble,
+    tools
+Suggests:
+    knitr,
     rmarkdown,
-    scales,
-    tidyr
-Remotes: 
-    rfortherestofus/pagedreport
+    testthat (>= 3.0.0),
+    withr
+VignetteBuilder: knitr
+Remotes:
+    cran/GGIR@3.3-9,
+    cran/GGIRread@1.0.11
+Config/testthat/edition: 3
